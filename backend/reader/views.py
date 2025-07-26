@@ -282,3 +282,57 @@ class DocumentListView(APIView):
             
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class DocumentDeleteView(APIView):
+    """Delete a document and its associated files."""
+    
+    def delete(self, request, document_id):
+        try:
+            document = get_object_or_404(Document, id=document_id)
+            
+            # Delete the physical file
+            if document.file:
+                file_path = document.file.path
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+            
+            # Delete the document record (this will cascade to pages, topics, etc.)
+            document.delete()
+            
+            return Response({
+                'message': 'Document deleted successfully'
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class DocumentFileView(APIView):
+    """Serve PDF files for viewing."""
+    
+    def get(self, request, document_id):
+        try:
+            from django.http import FileResponse, Http404
+            
+            document = get_object_or_404(Document, id=document_id)
+            
+            if not document.file:
+                raise Http404("Document file not found")
+            
+            file_path = document.file.path
+            if not os.path.exists(file_path):
+                raise Http404("Document file not found on disk")
+            
+            response = FileResponse(
+                open(file_path, 'rb'),
+                content_type='application/pdf',
+                filename=f"{document.title}.pdf"
+            )
+            response['Content-Disposition'] = f'inline; filename="{document.title}.pdf"'
+            return response
+            
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

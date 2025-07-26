@@ -170,6 +170,7 @@ CORS_ALLOW_HEADERS = [
     'user-agent',
     'x-csrftoken',
     'x-requested-with',
+    'range',  # Important for PDF streaming
 ]
 
 # CSRF Configuration for API
