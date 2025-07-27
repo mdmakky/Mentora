@@ -170,59 +170,35 @@ class ChatMessageView(APIView):
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     def _generate_ai_response(self, session, user_message, page_number=None):
-        """Generate AI response using LangChain."""
+        """Generate AI response using RAG (Retrieval Augmented Generation)."""
         try:
-            llm = ChatGoogleGenerativeAI(
-                model="gemini-1.5-flash",
-                google_api_key=settings.GOOGLE_API_KEY,
-                temperature=0.3
-            )
+            # Get the PDF processor with RAG capabilities
+            processor = PDFProcessor()
             
-            # Build context
-            context = ""
+            # Prepare document IDs for RAG search
+            document_ids = []
             if session.document:
-                if page_number:
-                    # Use specific page context
-                    try:
-                        page = Page.objects.get(document=session.document, page_number=int(page_number))
-                        context = f"Current page content: {page.content}"
-                    except Page.DoesNotExist:
-                        context = "Page not found."
-                else:
-                    # Use document summary as context
-                    context = f"Document: {session.document.title}\\nTopics: {', '.join(session.document.topics)}"
+                document_ids = [str(session.document.id)]
             
-            # Get conversation history
+            # Get conversation history for context
             recent_messages = session.messages.order_by('-timestamp')[:6]  # Last 6 messages
-            conversation_history = []
+            chat_history = []
             
             for msg in reversed(recent_messages):
-                if msg.message_type == 'user':
-                    conversation_history.append(HumanMessage(content=msg.content))
-                elif msg.message_type == 'ai':
-                    conversation_history.append(AIMessage(content=msg.content))
+                chat_history.append({
+                    'message_type': msg.message_type,
+                    'content': msg.content,
+                    'timestamp': msg.timestamp.isoformat()
+                })
             
-            # Build system prompt
-            system_prompt = """You are an intelligent study companion and tutor. Your role is to:
-            1. Help students understand study materials
-            2. Answer questions about content clearly and concisely
-            3. Provide explanations suitable for exam preparation
-            4. Break down complex topics into simpler concepts
-            5. Suggest study strategies when appropriate
+            # Use RAG to generate response
+            ai_response = processor.rag_chat_response(
+                query=user_message,
+                document_ids=document_ids,
+                chat_history=chat_history
+            )
             
-            Be helpful, encouraging, and patient. If you don't know something, say so honestly."""
-            
-            if context:
-                system_prompt += f"\\n\\nCurrent context: {context}"
-            
-            # Prepare messages
-            messages = [SystemMessage(content=system_prompt)]
-            messages.extend(conversation_history)
-            messages.append(HumanMessage(content=user_message))
-            
-            # Generate response
-            response = llm.invoke(messages)
-            return response.content
+            return ai_response
             
         except Exception as e:
             return f"I apologize, but I encountered an error while processing your request. Please try again. Error: {str(e)}"

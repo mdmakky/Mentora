@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 import uuid
+import json
 
 
 class Document(models.Model):
@@ -13,6 +14,7 @@ class Document(models.Model):
     total_pages = models.IntegerField(default=0)
     topics = models.JSONField(default=list, blank=True)  # Detected topics
     is_processed = models.BooleanField(default=False)
+    is_embedded = models.BooleanField(default=False)  # Track if embeddings are created
     
     class Meta:
         ordering = ['-upload_date']
@@ -34,6 +36,26 @@ class Page(models.Model):
 
     def __str__(self):
         return f"{self.document.title} - Page {self.page_number}"
+
+
+class DocumentChunk(models.Model):
+    """Model for text chunks with embeddings for semantic search."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    document = models.ForeignKey(Document, on_delete=models.CASCADE, related_name='chunks')
+    page = models.ForeignKey(Page, on_delete=models.CASCADE, related_name='chunks')
+    chunk_text = models.TextField()
+    chunk_index = models.IntegerField()  # Index within the page
+    start_char = models.IntegerField(default=0)  # Start position in page text
+    end_char = models.IntegerField(default=0)  # End position in page text
+    embedding_id = models.CharField(max_length=255, blank=True)  # ID in vector DB
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['page__page_number', 'chunk_index']
+        unique_together = ['page', 'chunk_index']
+    
+    def __str__(self):
+        return f"Chunk {self.chunk_index} - {self.document.title} - Page {self.page.page_number}"
 
 
 class Topic(models.Model):

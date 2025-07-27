@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8001/api';
+const API_BASE_URL = 'http://localhost:8000/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -27,11 +27,15 @@ export const uploadDocument = (file, title) => {
 };
 
 export const getDocument = (id) => {
-  return api.get(`/reader/documents/${id}/`);
+  return api.get(`/reader/documents/${id}/summary/`);
+};
+
+export const getDocumentFile = (id) => {
+  return `${API_BASE_URL}/reader/documents/${id}/file/`;
 };
 
 export const deleteDocument = (id) => {
-  return api.delete(`/reader/documents/${id}/`);
+  return api.delete(`/reader/documents/${id}/delete/`);
 };
 
 // Chat functions

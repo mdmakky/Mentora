@@ -6,16 +6,17 @@ from django.shortcuts import get_object_or_404
 from django.contrib.auth.models import User
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
-from .models import Document, Page, Topic, QuestionBank, Flashcard
+from .models import Document, Page, Topic, QuestionBank, Flashcard, DocumentChunk
 from .utils import PDFProcessor, save_uploaded_file, cleanup_file
 import os
 import uuid
 from django.conf import settings
+import json
 
 
 @method_decorator(csrf_exempt, name='dispatch')
 class DocumentUploadView(APIView):
-    """Handle PDF document uploads and processing."""
+    """Handle PDF document uploads and processing with embeddings."""
     parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request):
@@ -33,26 +34,61 @@ class DocumentUploadView(APIView):
                 file=file_obj
             )
             
-            # Basic PDF page count (without AI processing for now)
+            # Process PDF with AI and create embeddings
             try:
-                # Save file temporarily for processing
-                temp_path = f"/tmp/{uuid.uuid4()}.pdf"
-                save_uploaded_file(file_obj, temp_path)
+                processor = PDFProcessor()
                 
-                # Get basic PDF info
-                import PyPDF2
-                with open(temp_path, 'rb') as pdf_file:
-                    pdf_reader = PyPDF2.PdfReader(pdf_file)
-                    total_pages = len(pdf_reader.pages)
+                # Extract text from PDF
+                pdf_data = processor.extract_pdf_text(document.file.path)
                 
                 # Update document with basic info
-                document.total_pages = total_pages
-                document.topics = ["Sample Topic 1", "Sample Topic 2"]  # Placeholder topics
+                document.total_pages = pdf_data['total_pages']
                 document.is_processed = True
                 document.save()
                 
-                # Cleanup
-                cleanup_file(temp_path)
+                # Create page records
+                pages_data = []
+                for page_data in pdf_data['pages']:
+                    page = Page.objects.create(
+                        document=document,
+                        page_number=page_data['page_number'],
+                        content=page_data['content']
+                    )
+                    pages_data.append({
+                        'page_number': page.page_number,
+                        'content': page.content,
+                        'page_id': page.id
+                    })
+                
+                # Create embeddings for semantic search
+                chunks_data = processor.process_document_with_embeddings(
+                    str(document.id), 
+                    pages_data
+                )
+                
+                # Save chunks to database
+                for chunk_data in chunks_data:
+                    page = Page.objects.get(
+                        document=document, 
+                        page_number=chunk_data['page_number']
+                    )
+                    DocumentChunk.objects.create(
+                        document=document,
+                        page=page,
+                        chunk_text=chunk_data['chunk_text'],
+                        chunk_index=chunk_data['chunk_index'],
+                        start_char=chunk_data['start_char'],
+                        end_char=chunk_data['end_char'],
+                        embedding_id=chunk_data['embedding_id']
+                    )
+                
+                # Mark as embedded
+                document.is_embedded = True
+                
+                # Detect topics using AI
+                topics = processor.detect_topics(pdf_data['full_text'])
+                document.topics = topics
+                document.save()
                 
             except Exception as pdf_error:
                 print(f"PDF processing error: {str(pdf_error)}")
@@ -60,6 +96,7 @@ class DocumentUploadView(APIView):
                 document.total_pages = 0
                 document.topics = []
                 document.is_processed = False
+                document.is_embedded = False
                 document.save()
             
             return Response({
@@ -67,7 +104,8 @@ class DocumentUploadView(APIView):
                 'title': document.title,
                 'total_pages': document.total_pages,
                 'topics': document.topics,
-                'message': 'Document uploaded successfully'
+                'is_embedded': document.is_embedded,
+                'message': 'Document uploaded and processed successfully'
             }, status=status.HTTP_201_CREATED)
             
         except Exception as e:
@@ -303,6 +341,119 @@ class DocumentDeleteView(APIView):
             
             return Response({
                 'message': 'Document deleted successfully'
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class SemanticSearchView(APIView):
+    """Perform semantic search across documents."""
+    
+    def post(self, request):
+        try:
+            query = request.data.get('query', '')
+            document_ids = request.data.get('document_ids', [])
+            top_k = request.data.get('top_k', 5)
+            
+            if not query:
+                return Response({'error': 'Query is required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            processor = PDFProcessor()
+            
+            # Convert document_ids to strings if they're UUIDs
+            str_document_ids = [str(doc_id) for doc_id in document_ids] if document_ids else None
+            
+            # Perform semantic search
+            search_results = processor.semantic_query(query, str_document_ids)
+            
+            # Format results with document information
+            formatted_results = []
+            for result in search_results.get('semantic_results', []):
+                metadata = result.get('metadata', {})
+                doc_id = metadata.get('document_id')
+                
+                try:
+                    document = Document.objects.get(id=doc_id)
+                    formatted_result = {
+                        'content': result['content'],
+                        'similarity_score': result['similarity_score'],
+                        'document_id': doc_id,
+                        'document_title': document.title,
+                        'page_number': metadata.get('page_number'),
+                        'chunk_index': metadata.get('chunk_index'),
+                    }
+                    formatted_results.append(formatted_result)
+                except Document.DoesNotExist:
+                    continue
+            
+            return Response({
+                'query': query,
+                'results': formatted_results,
+                'total_results': len(formatted_results)
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class RAGChatView(APIView):
+    """Chat with documents using RAG (Retrieval Augmented Generation)."""
+    
+    def post(self, request):
+        try:
+            query = request.data.get('query', '')
+            document_ids = request.data.get('document_ids', [])
+            chat_history = request.data.get('chat_history', [])
+            
+            if not query:
+                return Response({'error': 'Query is required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            processor = PDFProcessor()
+            
+            # Convert document_ids to strings if they're UUIDs
+            str_document_ids = [str(doc_id) for doc_id in document_ids] if document_ids else None
+            
+            # Generate RAG response
+            response = processor.rag_chat_response(query, str_document_ids, chat_history)
+            
+            # Also get the search results for transparency
+            search_results = processor.semantic_query(query, str_document_ids)
+            
+            return Response({
+                'query': query,
+                'response': response,
+                'source_chunks': len(search_results.get('semantic_results', [])),
+                'timestamp': uuid.uuid4().hex  # Simple timestamp for conversation tracking
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class DocumentStatsView(APIView):
+    """Get statistics about document processing and embeddings."""
+    
+    def get(self, request):
+        try:
+            total_documents = Document.objects.count()
+            processed_documents = Document.objects.filter(is_processed=True).count()
+            embedded_documents = Document.objects.filter(is_embedded=True).count()
+            total_chunks = DocumentChunk.objects.count()
+            
+            # Get vector store stats
+            processor = PDFProcessor()
+            vector_stats = processor.vector_service.get_collection_stats()
+            
+            return Response({
+                'total_documents': total_documents,
+                'processed_documents': processed_documents,
+                'embedded_documents': embedded_documents,
+                'total_chunks': total_chunks,
+                'vector_store_stats': vector_stats
             }, status=status.HTTP_200_OK)
             
         except Exception as e:

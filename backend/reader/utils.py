@@ -1,12 +1,13 @@
 import PyPDF2
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.schema import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 import os
 from django.conf import settings
 import json
 import re
 from typing import List, Dict, Any
+from .vector_service import VectorStoreService, RAGService
 
 
 class PDFProcessor:
@@ -20,6 +21,94 @@ class PDFProcessor:
             chunk_size=2000,
             chunk_overlap=200
         )
+        self.vector_service = VectorStoreService()
+        self.rag_service = RAGService(self.vector_service)
+
+    def extract_pdf_text(self, pdf_file_path: str) -> Dict[str, Any]:
+        """Extract text from PDF with page-wise content."""
+        pages = []
+        full_text = ""
+        
+        with open(pdf_file_path, 'rb') as file:
+            pdf_reader = PyPDF2.PdfReader(file)
+            
+            for page_num, page in enumerate(pdf_reader.pages):
+                page_text = page.extract_text()
+                pages.append({
+                    'page_number': page_num + 1,
+                    'content': page_text
+                })
+                full_text += f"\\n\\n--- Page {page_num + 1} ---\\n\\n{page_text}"
+        
+        return {
+            'pages': pages,
+            'full_text': full_text,
+            'total_pages': len(pages)
+        }
+
+    def process_document_with_embeddings(self, document_id: str, pages_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Process document and create embeddings for semantic search.
+        This is the core function that implements the PDF → Chunks → Embeddings flow from your diagram.
+        """
+        try:
+            # Create embeddings using vector service
+            chunks_data = self.vector_service.create_embeddings(document_id, pages_data)
+            return chunks_data
+        except Exception as e:
+            print(f"Error processing document embeddings: {str(e)}")
+            return []
+
+    def semantic_query(self, query: str, document_ids: List[str] = None) -> Dict[str, Any]:
+        """
+        Perform semantic search on documents - implements the User Query → Embedding → Search flow.
+        """
+    def rag_chat_response(self, query: str, document_ids: List[str] = None, chat_history: List[Dict] = None) -> str:
+        """
+        Generate AI response using RAG - implements the System Query (Pages + User Query) → LLM → Final Output flow.
+        """
+        try:
+            # Get relevant context from documents
+            context = self.rag_service.get_context_for_query(query, document_ids)
+            
+            # Prepare chat history context
+            history_context = ""
+            if chat_history:
+                recent_history = chat_history[-6:]  # Last 3 exchanges
+                for msg in recent_history:
+                    role = "User" if msg.get('message_type') == 'user' else "Assistant"
+                    history_context += f"{role}: {msg.get('content', '')}\n"
+            
+            # Create enhanced prompt with context
+            prompt = f"""
+            You are an AI tutor helping students understand their study materials. Use the provided context to answer the question comprehensively.
+            
+            Context from Documents:
+            {context}
+            
+            Chat History:
+            {history_context}
+            
+            Student Question: {query}
+            
+            Instructions:
+            - Use information from the provided context when relevant
+            - If the context doesn't contain sufficient information, say so clearly
+            - Provide educational explanations suitable for students
+            - Reference specific pages when using information from the context
+            - Be encouraging and supportive in your tone
+            """
+            
+            messages = [
+                SystemMessage(content="You are a helpful AI tutor specializing in explaining academic content clearly."),
+                HumanMessage(content=prompt)
+            ]
+            
+            response = self.llm.invoke(messages)
+            return response.content
+            
+        except Exception as e:
+            return f"I apologize, but I encountered an error while processing your question: {str(e)}"
 
     def extract_pdf_text(self, pdf_file_path: str) -> Dict[str, Any]:
         """Extract text from PDF with page-wise content."""

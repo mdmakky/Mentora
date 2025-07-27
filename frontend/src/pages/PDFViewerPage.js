@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Document, Page, pdfjs } from 'react-pdf';
-import { explainConcept } from '../services/api';
+import { getDocumentFile, explainConcept } from '../services/api';
 
 // Import CSS for text layer
 import 'react-pdf/dist/Page/AnnotationLayer.css';
@@ -29,21 +29,30 @@ const PDFViewerPage = () => {
 
   const fetchDocument = async () => {
     try {
-      const response = await fetch(`http://localhost:8001/api/reader/documents/`);
+      setLoading(true);
+      
+      // Get document list and find the specific document
+      const response = await fetch('http://localhost:8000/api/reader/documents/');
       const data = await response.json();
-      
-      // Handle both array format and documents wrapper format
       const documents = data.documents || data;
-      const doc = documents.find((d) => d.id === documentId);
+      const documentData = documents.find(doc => doc.id === documentId);
       
-      if (doc) {
-        console.log('Document found:', doc);
-        console.log('File URL will be:', `http://localhost:8001${doc.file}`);
-        setDocument(doc);
-      } else {
-        setError(`Document not found. Looking for ID: ${documentId}`);
+      if (!documentData) {
+        setError('Document not found');
+        return;
       }
+      
+      // Create document object with file URL
+      const doc = {
+        ...documentData,
+        fileUrl: getDocumentFile(documentId)
+      };
+      
+      console.log('Document loaded:', doc);
+      setDocument(doc);
+      setError('');
     } catch (err) {
+      console.error('Error fetching document:', err);
       setError('Failed to fetch document');
     } finally {
       setLoading(false);
@@ -301,11 +310,11 @@ const PDFViewerPage = () => {
                 <div className="p-6">
                   {document && (
                     <Document
-                      file={`http://localhost:8001${document.file}`}
+                      file={document.fileUrl}
                       onLoadSuccess={onDocumentLoadSuccess}
                       onLoadError={(error) => {
                         console.error('PDF Load Error:', error);
-                        console.log('Attempted URL:', `http://localhost:8001${document.file}`);
+                        console.log('Attempted URL:', document.fileUrl);
                         console.log('Document object:', document);
                         setError('Failed to load PDF. Please check the console for details.');
                       }}
