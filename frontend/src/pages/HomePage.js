@@ -166,11 +166,11 @@ const HomePage = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
         {/* Quick Actions */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-20">
-          <div className="group relative">
+          <div className="group relative h-full">
             <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-3xl blur opacity-20 group-hover:opacity-30 transition duration-300"></div>
-            <div className="relative bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-3xl p-10 border border-white/20 dark:border-gray-700/30 shadow-2xl card-hover">
-              <div className="flex items-center mb-8">
-                <div className="relative group-hover:scale-110 transition-transform duration-300">
+            <div className="relative bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-3xl p-8 border border-white/20 dark:border-gray-700/30 shadow-2xl card-hover h-full flex flex-col">
+              <div className="flex items-start mb-6">
+                <div className="relative group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
                   <div className="absolute -inset-2 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl blur opacity-30"></div>
                   <div className="relative w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 dark:from-indigo-600 dark:to-purple-700 rounded-2xl flex items-center justify-center shadow-xl">
                     <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -178,28 +178,30 @@ const HomePage = () => {
                     </svg>
                   </div>
                 </div>
-                <div className="ml-6">
-                  <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">Study Hub</h3>
-                  <p className="text-gray-600 dark:text-gray-400 text-lg">Browse and learn from your documents with AI assistance</p>
+                <div className="ml-4 flex-1">
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">Study Hub</h3>
+                  <p className="text-gray-600 dark:text-gray-400 text-base leading-relaxed">Browse and learn from your documents with AI assistance</p>
                 </div>
               </div>
-              <Link 
-                to="/study" 
-                className="group inline-flex items-center px-8 py-4 bg-gradient-to-r from-indigo-500 to-purple-600 dark:from-indigo-600 dark:to-purple-700 text-white font-semibold rounded-2xl hover:from-indigo-600 hover:to-purple-700 dark:hover:from-indigo-700 dark:hover:to-purple-800 transition-all duration-300 hover:scale-105 shadow-xl text-lg"
-              >
-                Start Studying
-                <svg className="w-5 h-5 ml-3 group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </Link>
+              <div className="mt-auto">
+                <Link 
+                  to="/study" 
+                  className="group inline-flex items-center justify-center w-full px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-600 dark:from-indigo-600 dark:to-purple-700 text-white font-semibold rounded-2xl hover:from-indigo-600 hover:to-purple-700 dark:hover:from-indigo-700 dark:hover:to-purple-800 transition-all duration-300 hover:scale-105 shadow-xl"
+                >
+                  Start Studying
+                  <svg className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </Link>
+              </div>
             </div>
           </div>
 
-          <div className="group relative">
+          <div className="group relative h-full">
             <div className="absolute -inset-1 bg-gradient-to-r from-green-500 to-emerald-600 rounded-3xl blur opacity-20 group-hover:opacity-30 transition duration-300"></div>
-            <div className="relative bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-3xl p-10 border border-white/20 dark:border-gray-700/30 shadow-2xl card-hover">
-              <div className="flex items-center mb-8">
-                <div className="relative group-hover:scale-110 transition-transform duration-300">
+            <div className="relative bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-3xl p-8 border border-white/20 dark:border-gray-700/30 shadow-2xl card-hover h-full flex flex-col">
+              <div className="flex items-start mb-6">
+                <div className="relative group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
                   <div className="absolute -inset-2 bg-gradient-to-r from-green-500 to-emerald-600 rounded-2xl blur opacity-30"></div>
                   <div className="relative w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 dark:from-green-600 dark:to-emerald-700 rounded-2xl flex items-center justify-center shadow-xl">
                     <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -207,28 +209,30 @@ const HomePage = () => {
                     </svg>
                   </div>
                 </div>
-                <div className="ml-6">
-                  <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">AI Assistant</h3>
-                  <p className="text-gray-600 dark:text-gray-400 text-lg">Get instant answers to your questions with AI</p>
+                <div className="ml-4 flex-1">
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">AI Assistant</h3>
+                  <p className="text-gray-600 dark:text-gray-400 text-base leading-relaxed">Get instant answers to your questions with AI</p>
                 </div>
               </div>
-              <Link 
-                to="/chat" 
-                className="group inline-flex items-center px-8 py-4 bg-gradient-to-r from-green-500 to-emerald-600 dark:from-green-600 dark:to-emerald-700 text-white font-semibold rounded-2xl hover:from-green-600 hover:to-emerald-700 dark:hover:from-green-700 dark:hover:to-emerald-800 transition-all duration-300 hover:scale-105 shadow-xl text-lg"
-              >
-                Chat with AI
-                <svg className="w-5 h-5 ml-3 group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </Link>
+              <div className="mt-auto">
+                <Link 
+                  to="/chat" 
+                  className="group inline-flex items-center justify-center w-full px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 dark:from-green-600 dark:to-emerald-700 text-white font-semibold rounded-2xl hover:from-green-600 hover:to-emerald-700 dark:hover:from-green-700 dark:hover:to-emerald-800 transition-all duration-300 hover:scale-105 shadow-xl"
+                >
+                  Chat with AI
+                  <svg className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </Link>
+              </div>
             </div>
           </div>
 
-          <div className="group relative">
+          <div className="group relative h-full">
             <div className="absolute -inset-1 bg-gradient-to-r from-purple-500 to-pink-600 rounded-3xl blur opacity-20 group-hover:opacity-30 transition duration-300"></div>
-            <div className="relative bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-3xl p-10 border border-white/20 dark:border-gray-700/30 shadow-2xl card-hover">
-              <div className="flex items-center mb-8">
-                <div className="relative group-hover:scale-110 transition-transform duration-300">
+            <div className="relative bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-3xl p-8 border border-white/20 dark:border-gray-700/30 shadow-2xl card-hover h-full flex flex-col">
+              <div className="flex items-start mb-6">
+                <div className="relative group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
                   <div className="absolute -inset-2 bg-gradient-to-r from-purple-500 to-pink-600 rounded-2xl blur opacity-30"></div>
                   <div className="relative w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-600 dark:from-purple-600 dark:to-pink-700 rounded-2xl flex items-center justify-center shadow-xl">
                     <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -236,20 +240,22 @@ const HomePage = () => {
                     </svg>
                   </div>
                 </div>
-                <div className="ml-6">
-                  <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">Analytics</h3>
-                  <p className="text-gray-600 dark:text-gray-400 text-lg">Track your learning progress and insights</p>
+                <div className="ml-4 flex-1">
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">Analytics</h3>
+                  <p className="text-gray-600 dark:text-gray-400 text-base leading-relaxed">Track your learning progress and insights</p>
                 </div>
               </div>
-              <Link 
-                to="/analytics" 
-                className="group inline-flex items-center px-8 py-4 bg-gradient-to-r from-purple-500 to-pink-600 dark:from-purple-600 dark:to-pink-700 text-white font-semibold rounded-2xl hover:from-purple-600 hover:to-pink-700 dark:hover:from-purple-700 dark:hover:to-pink-800 transition-all duration-300 hover:scale-105 shadow-xl text-lg"
-              >
-                View Analytics
-                <svg className="w-5 h-5 ml-3 group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </Link>
+              <div className="mt-auto">
+                <Link 
+                  to="/analytics" 
+                  className="group inline-flex items-center justify-center w-full px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-600 dark:from-purple-600 dark:to-pink-700 text-white font-semibold rounded-2xl hover:from-purple-600 hover:to-pink-700 dark:hover:from-purple-700 dark:hover:to-pink-800 transition-all duration-300 hover:scale-105 shadow-xl"
+                >
+                  View Analytics
+                  <svg className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </Link>
+              </div>
             </div>
           </div>
         </div>
@@ -321,46 +327,48 @@ const HomePage = () => {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                   {documents.map((doc) => (
-                    <div key={doc.id} className="group relative">
+                    <div key={doc.id} className="group relative h-full">
                       <div className="absolute -inset-1 bg-gradient-to-r from-red-400/20 to-orange-500/20 rounded-3xl blur opacity-0 group-hover:opacity-100 transition duration-300"></div>
-                      <div className="relative bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl p-8 border border-white/20 dark:border-gray-700/30 shadow-xl card-hover">
-                        <div className="flex items-start justify-between mb-6">
-                          <div className="relative group-hover:scale-110 transition-transform duration-300">
+                      <div className="relative bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl p-6 border border-white/20 dark:border-gray-700/30 shadow-xl card-hover h-full flex flex-col">
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="relative group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
                             <div className="absolute -inset-2 bg-gradient-to-r from-red-400 to-orange-500 rounded-2xl blur opacity-30"></div>
-                            <div className="relative w-16 h-16 bg-gradient-to-br from-red-400 to-red-600 dark:from-red-500 dark:to-red-700 rounded-2xl flex items-center justify-center shadow-xl">
-                              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div className="relative w-14 h-14 bg-gradient-to-br from-red-400 to-red-600 dark:from-red-500 dark:to-red-700 rounded-2xl flex items-center justify-center shadow-xl">
+                              <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                               </svg>
                             </div>
                           </div>
                         </div>
                         
-                        <h3 className="font-bold text-gray-900 dark:text-gray-100 mb-3 text-xl line-clamp-2 leading-tight">{doc.title}</h3>
-                        <p className="text-gray-600 dark:text-gray-400 mb-6 text-lg">
-                          {doc.total_pages} pages • Uploaded {formatDate(doc.upload_date)}
-                        </p>
-                        
-                        <div className="mb-6">
-                          {doc.topics && doc.topics.slice(0, 3).map((topic, index) => (
-                            <span
-                              key={index}
-                              className="inline-block bg-gradient-to-r from-blue-100 to-indigo-100 dark:from-blue-900/50 dark:to-indigo-900/50 text-indigo-800 dark:text-indigo-200 text-sm font-medium px-4 py-2 rounded-full mr-2 mb-2 border border-indigo-200 dark:border-indigo-700 backdrop-blur-sm"
-                            >
-                              {topic}
-                            </span>
-                          ))}
+                        <div className="flex-1 flex flex-col">
+                          <h3 className="font-bold text-gray-900 dark:text-gray-100 mb-3 text-lg leading-tight line-clamp-2 min-h-[3.5rem]">{doc.title}</h3>
+                          <p className="text-gray-600 dark:text-gray-400 mb-4 text-sm">
+                            {doc.total_pages} pages • Uploaded {formatDate(doc.upload_date)}
+                          </p>
+                          
+                          <div className="mb-4 min-h-[2.5rem] flex flex-wrap">
+                            {doc.topics && doc.topics.slice(0, 3).map((topic, index) => (
+                              <span
+                                key={index}
+                                className="inline-block bg-gradient-to-r from-blue-100 to-indigo-100 dark:from-blue-900/50 dark:to-indigo-900/50 text-indigo-800 dark:text-indigo-200 text-xs font-medium px-3 py-1 rounded-full mr-2 mb-1 border border-indigo-200 dark:border-indigo-700 backdrop-blur-sm"
+                              >
+                                {topic}
+                              </span>
+                            ))}
+                          </div>
                         </div>
                         
-                        <div className="flex space-x-3">
+                        <div className="flex space-x-2 mt-auto">
                           <Link
                             to={`/pdf/${doc.id}`}
-                            className="flex-1 bg-gradient-to-r from-indigo-500 to-purple-600 dark:from-indigo-600 dark:to-purple-700 text-white px-4 py-3 rounded-xl text-center hover:from-indigo-600 hover:to-purple-700 dark:hover:from-indigo-700 dark:hover:to-purple-800 transition-all duration-300 font-semibold hover:scale-105 shadow-lg"
+                            className="flex-1 bg-gradient-to-r from-indigo-500 to-purple-600 dark:from-indigo-600 dark:to-purple-700 text-white px-3 py-2.5 rounded-xl text-center hover:from-indigo-600 hover:to-purple-700 dark:hover:from-indigo-700 dark:hover:to-purple-800 transition-all duration-300 font-semibold hover:scale-105 shadow-lg text-sm"
                           >
                             View PDF
                           </Link>
                           <Link
                             to={`/chat?document=${doc.id}`}
-                            className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 dark:from-green-600 dark:to-emerald-700 text-white px-4 py-3 rounded-xl text-center hover:from-green-600 hover:to-emerald-700 dark:hover:from-green-700 dark:hover:to-emerald-800 transition-all duration-300 font-semibold hover:scale-105 shadow-lg"
+                            className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 dark:from-green-600 dark:to-emerald-700 text-white px-3 py-2.5 rounded-xl text-center hover:from-green-600 hover:to-emerald-700 dark:hover:from-green-700 dark:hover:to-emerald-800 transition-all duration-300 font-semibold hover:scale-105 shadow-lg text-sm"
                           >
                             Chat
                           </Link>
