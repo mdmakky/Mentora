@@ -104,8 +104,7 @@ const ChatPage = () => {
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-gray-100 dark:from-gray-900 dark:to-slate-800 flex items-center justify-center transition-colors duration-300">
         <div className="text-center">
           <div className="relative mb-8">
-            <div className="w-16 h-16 border-4 border-indigo-200 dark:border-gray-600 border-t-indigo-600 dark:border-t-indigo-400 rounded-full animate-spin mx-auto"></div>
-            <div className="absolute inset-0 w-16 h-16 border-4 border-transparent border-r-purple-400 rounded-full animate-spin animate-reverse mx-auto"></div>
+            <div className="w-16 h-16 border-4 border-indigo-200 dark:border-gray-600 border-t-indigo-600 dark:border-t-indigo-400 rounded-full mx-auto"></div>
           </div>
           <p className="text-lg font-medium text-gray-700 dark:text-gray-300">Loading your chat sessions...</p>
         </div>
@@ -128,7 +127,7 @@ const ChatPage = () => {
           </div>
           <button
             onClick={createNewSession}
-            className="w-full bg-white/20 hover:bg-white/30 text-white font-medium px-4 py-3 rounded-xl transition-all duration-200 hover:scale-105 backdrop-blur-sm border border-white/30"
+            className="w-full bg-white/20 hover:bg-white/30 text-white font-medium px-4 py-3 rounded-xl transition-all duration-200 backdrop-blur-sm border border-white/30"
           >
             <svg className="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -156,7 +155,7 @@ const ChatPage = () => {
                   setCurrentSession(session);
                   loadMessages(session.id);
                 }}
-                className={`group p-4 mx-3 my-2 rounded-xl cursor-pointer transition-all duration-200 hover:scale-105 ${
+                className={`group p-4 mx-3 my-2 rounded-xl cursor-pointer transition-all duration-200 ${
                   currentSession?.id === session.id 
                     ? 'bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/50 dark:to-purple-900/50 border-2 border-indigo-200 dark:border-indigo-600 shadow-md' 
                     : 'bg-white/50 dark:bg-gray-700/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-600/50 hover:bg-white/70 dark:hover:bg-gray-700/70 hover:shadow-md'
@@ -166,7 +165,7 @@ const ChatPage = () => {
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center mr-3 ${
                     currentSession?.id === session.id 
                       ? 'bg-gradient-to-br from-indigo-500 to-purple-600' 
-                      : 'bg-gradient-to-br from-green-400 to-emerald-600 group-hover:scale-110'
+                      : 'bg-gradient-to-br from-green-400 to-emerald-600'
                   } transition-transform duration-200`}>
                     <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -215,7 +214,7 @@ const ChatPage = () => {
               </p>
               <button
                 onClick={createNewSession}
-                className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-600 dark:from-indigo-600 dark:to-purple-700 text-white font-medium rounded-xl hover:from-indigo-600 hover:to-purple-700 dark:hover:from-indigo-700 dark:hover:to-purple-800 transition-all duration-200 hover:scale-105 shadow-lg"
+                className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-600 dark:from-indigo-600 dark:to-purple-700 text-white font-medium rounded-xl hover:from-indigo-600 hover:to-purple-700 dark:hover:from-indigo-700 dark:hover:to-purple-800 transition-all duration-200 shadow-lg"
               >
                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -319,9 +318,9 @@ const ChatPage = () => {
                     </div>
                     <div className="bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-600/50 text-gray-900 dark:text-gray-100 px-4 py-3 rounded-2xl shadow-sm">
                       <div className="flex items-center space-x-1">
-                        <div className="w-2 h-2 bg-gray-400 dark:bg-gray-300 rounded-full animate-bounce"></div>
-                        <div className="w-2 h-2 bg-gray-400 dark:bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                        <div className="w-2 h-2 bg-gray-400 dark:bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                        <div className="w-2 h-2 bg-gray-400 dark:bg-gray-300 rounded-full"></div>
+                        <div className="w-2 h-2 bg-gray-400 dark:bg-gray-300 rounded-full"></div>
+                        <div className="w-2 h-2 bg-gray-400 dark:bg-gray-300 rounded-full"></div>
                       </div>
                     </div>
                   </div>
@@ -350,10 +349,10 @@ const ChatPage = () => {
                   <button
                     onClick={handleSendMessage}
                     disabled={!inputMessage.trim() || sending}
-                    className="bg-gradient-to-r from-indigo-500 to-purple-600 dark:from-indigo-600 dark:to-purple-700 text-white px-6 py-3 rounded-2xl hover:from-indigo-600 hover:to-purple-700 dark:hover:from-indigo-700 dark:hover:to-purple-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 self-end hover:scale-105 shadow-lg flex items-center justify-center min-w-[80px]"
+                    className="bg-gradient-to-r from-indigo-500 to-purple-600 dark:from-indigo-600 dark:to-purple-700 text-white px-6 py-3 rounded-2xl hover:from-indigo-600 hover:to-purple-700 dark:hover:from-indigo-700 dark:hover:to-purple-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 self-end shadow-lg flex items-center justify-center min-w-[80px]"
                   >
                     {sending ? (
-                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"></div>
                     ) : (
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />

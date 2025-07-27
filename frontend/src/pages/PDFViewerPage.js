@@ -3,6 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { explainConcept } from '../services/api';
 
+// Import CSS for text layer
+import 'react-pdf/dist/Page/AnnotationLayer.css';
+import 'react-pdf/dist/Page/TextLayer.css';
+
 // Set up PDF.js worker - use the version-compatible worker from react-pdf
 pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
 
@@ -152,8 +156,7 @@ const PDFViewerPage = () => {
         
         <div className="relative text-center">
           <div className="relative mb-8">
-            <div className="w-20 h-20 border-4 border-indigo-200 dark:border-gray-600 border-t-indigo-600 dark:border-t-indigo-400 rounded-full animate-spin mx-auto"></div>
-            <div className="absolute inset-0 w-20 h-20 border-4 border-transparent border-r-purple-400 rounded-full animate-spin animate-reverse mx-auto"></div>
+            <div className="w-20 h-20 border-4 border-indigo-200 dark:border-gray-600 border-t-indigo-600 dark:border-t-indigo-400 rounded-full mx-auto"></div>
           </div>
           <div className="max-w-md">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3">Loading Document</h2>
@@ -209,8 +212,8 @@ const PDFViewerPage = () => {
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-gradient-to-br from-cyan-400/10 to-purple-400/10 rounded-full blur-3xl"></div>
       </div>
 
-      <div className="relative max-w-7xl mx-auto px-4 py-8">
-        {/* Header */}
+      <div className={`relative max-w-7xl mx-auto px-4 py-8 transition-all duration-300 ${sidebarOpen ? 'mr-[25%] ml-[8%]' : ''}`}>
+        {/* Header - moves with content */}
         <div className="relative overflow-hidden mb-8">
           <div className="absolute -inset-4 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 rounded-3xl blur-2xl"></div>
           <div className="relative bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-3xl border border-white/20 dark:border-gray-700/30 shadow-2xl">
@@ -288,9 +291,9 @@ const PDFViewerPage = () => {
         </div>
 
         {/* Main Content Layout */}
-        <div className="flex gap-8">
+        <div className="flex justify-center">
           {/* PDF Viewer Section */}
-          <div className={`flex-1 transition-all duration-300 ${sidebarOpen ? 'mr-0' : ''}`}>
+          <div className="flex-1 max-w-5xl">
             <div className="relative overflow-hidden">
               <div className="absolute -inset-4 bg-gradient-to-r from-blue-500/10 via-indigo-500/10 to-purple-500/10 rounded-3xl blur-2xl"></div>
               <div className="relative bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-3xl border border-white/20 dark:border-gray-700/30 shadow-2xl overflow-hidden">
@@ -366,7 +369,7 @@ const PDFViewerPage = () => {
                                     <Page
                                       pageNumber={index + 1}
                                       scale={scale}
-                                      renderTextLayer={false}
+                                      renderTextLayer={true}
                                       renderAnnotationLayer={false}
                                     />
                                   </div>
@@ -383,191 +386,193 @@ const PDFViewerPage = () => {
             </div>
           </div>
 
-          {/* AI Chat Sidebar */}
-          {sidebarOpen && (
-            <div className="w-96 flex-shrink-0">
-              <div className="relative overflow-hidden">
-                <div className="absolute -inset-4 bg-gradient-to-r from-green-500/10 via-blue-500/10 to-purple-500/10 rounded-3xl blur-2xl"></div>
-                <div className="relative bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-3xl border border-white/20 dark:border-gray-700/30 shadow-2xl flex flex-col h-[calc(100vh-200px)]">
-                  {/* Chat Header */}
-                  <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 dark:from-indigo-700 dark:via-purple-700 dark:to-pink-700 rounded-t-3xl px-6 py-6 relative overflow-hidden">
-                    <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent"></div>
-                    <div className="relative flex items-center space-x-4">
-                      <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/30">
-                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                        </svg>
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="text-lg font-bold text-white">AI Study Assistant</h3>
-                        <p className="text-sm text-white/80">Intelligent document analysis</p>
-                      </div>
-                      {messages.length > 0 && (
-                        <button 
-                          onClick={handleDownloadConversation}
-                          className="p-2.5 hover:bg-white/10 rounded-xl transition-all duration-200 hover:scale-105 group"
-                          title="Download Conversation"
-                        >
-                          <svg className="w-5 h-5 text-white group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                        </button>
-                      )}
+          {/* AI Chat Sidebar - Always rendered but positioned off-screen when closed */}
+          <div 
+            className={`fixed top-0 right-0 h-screen w-[25%] z-50 transition-transform duration-300 ease-in-out ${
+              sidebarOpen ? 'transform translate-x-0' : 'transform translate-x-full'
+            }`}
+          >
+            <div className="h-full relative overflow-hidden">
+              <div className="absolute -inset-4 bg-gradient-to-r from-green-500/10 via-blue-500/10 to-purple-500/10 rounded-3xl blur-2xl"></div>
+              <div className="relative bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-l-3xl border border-white/20 dark:border-gray-700/30 shadow-2xl flex flex-col h-full">
+                {/* Chat Header */}
+                <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 dark:from-indigo-700 dark:via-purple-700 dark:to-pink-700 rounded-tl-3xl px-6 py-6 relative overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent"></div>
+                  <div className="relative flex items-center space-x-4">
+                    <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/30">
+                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
                     </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-bold text-white">AI Study Assistant</h3>
+                      <p className="text-sm text-white/80">Intelligent document analysis</p>
+                    </div>
+                    {messages.length > 0 && (
+                      <button 
+                        onClick={handleDownloadConversation}
+                        className="p-2.5 hover:bg-white/10 rounded-xl transition-all duration-200 hover:scale-105 group"
+                        title="Download Conversation"
+                      >
+                        <svg className="w-5 h-5 text-white group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      </button>
+                    )}
                   </div>
+                </div>
 
-                  {/* Chat Messages */}
-                  <div className="flex-1 overflow-auto p-6 space-y-4 bg-gradient-to-b from-gray-50/50 to-white dark:from-gray-800/50 dark:to-gray-800">
-                    {messages.length === 0 ? (
-                      <div className="h-full flex items-center justify-center">
-                        <div className="text-center max-w-sm">
-                          <div className="w-20 h-20 bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/50 dark:to-purple-900/50 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                            <svg className="w-10 h-10 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                {/* Chat Messages */}
+                <div className="flex-1 overflow-auto p-6 space-y-4 bg-gradient-to-b from-gray-50/50 to-white dark:from-gray-800/50 dark:to-gray-800">
+                  {messages.length === 0 ? (
+                    <div className="h-full flex items-center justify-center">
+                      <div className="text-center max-w-sm">
+                        <div className="w-20 h-20 bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/50 dark:to-purple-900/50 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                          <svg className="w-10 h-10 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                          </svg>
+                        </div>
+                        <h4 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-3">Welcome to AI Assistant</h4>
+                        <p className="text-gray-600 dark:text-gray-400 leading-relaxed mb-6">I'm here to help you understand this document. Ask me anything about its content, concepts, or specific sections.</p>
+                        <div className="space-y-2 text-sm text-gray-500 dark:text-gray-400">
+                          <p className="flex items-center justify-center">
+                            <svg className="w-4 h-4 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                             </svg>
-                          </div>
-                          <h4 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-3">Welcome to AI Assistant</h4>
-                          <p className="text-gray-600 dark:text-gray-400 leading-relaxed mb-6">I'm here to help you understand this document. Ask me anything about its content, concepts, or specific sections.</p>
-                          <div className="space-y-2 text-sm text-gray-500 dark:text-gray-400">
-                            <p className="flex items-center justify-center">
-                              <svg className="w-4 h-4 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                              </svg>
-                              Explain concepts
-                            </p>
-                            <p className="flex items-center justify-center">
-                              <svg className="w-4 h-4 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                              </svg>
-                              Answer questions
-                            </p>
-                            <p className="flex items-center justify-center">
-                              <svg className="w-4 h-4 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                              </svg>
-                              Provide study tips
-                            </p>
-                          </div>
+                            Explain concepts
+                          </p>
+                          <p className="flex items-center justify-center">
+                            <svg className="w-4 h-4 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            Answer questions
+                          </p>
+                          <p className="flex items-center justify-center">
+                            <svg className="w-4 h-4 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            Provide study tips
+                          </p>
                         </div>
                       </div>
-                    ) : (
-                      <div className="space-y-6">
-                        {messages.map((message) => (
-                          <div key={message.id} className="group">
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      {messages.map((message) => (
+                        <div key={message.id} className="group">
+                          <div 
+                            className={`relative ${
+                              message.isUser ? 'ml-8' : 'mr-8'
+                            }`}
+                          >
                             <div 
-                              className={`relative ${
-                                message.isUser ? 'ml-8' : 'mr-8'
+                              className={`rounded-2xl p-4 shadow-sm border transition-all duration-200 group-hover:shadow-md ${
+                                message.isUser 
+                                  ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white border-indigo-200' 
+                                  : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-800 dark:text-gray-200'
                               }`}
                             >
-                              <div 
-                                className={`rounded-2xl p-4 shadow-sm border transition-all duration-200 group-hover:shadow-md ${
-                                  message.isUser 
-                                    ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white border-indigo-200' 
-                                    : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-800 dark:text-gray-200'
-                                }`}
-                              >
-                                <div className="flex items-center mb-3">
-                                  <div 
-                                    className={`w-7 h-7 rounded-full flex items-center justify-center mr-3 ${
-                                      message.isUser ? 'bg-white/20' : 'bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/50 dark:to-purple-900/50'
-                                    }`}
-                                  >
-                                    {message.isUser ? (
-                                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                      </svg>
-                                    ) : (
-                                      <svg className="w-4 h-4 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                                      </svg>
-                                    )}
-                                  </div>
-                                  <div className="flex-1">
-                                    <span className={`text-sm font-semibold ${message.isUser ? 'text-white' : 'text-gray-700 dark:text-gray-300'}`}>
-                                      {message.isUser ? 'You' : 'AI Assistant'}
-                                    </span>
-                                    <span className={`text-xs ml-2 ${message.isUser ? 'text-white/70' : 'text-gray-500 dark:text-gray-400'}`}>
-                                      {message.timestamp.toLocaleTimeString()}
-                                    </span>
-                                  </div>
+                              <div className="flex items-center mb-3">
+                                <div 
+                                  className={`w-7 h-7 rounded-full flex items-center justify-center mr-3 ${
+                                    message.isUser ? 'bg-white/20' : 'bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/50 dark:to-purple-900/50'
+                                  }`}
+                                >
+                                  {message.isUser ? (
+                                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                    </svg>
+                                  ) : (
+                                    <svg className="w-4 h-4 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                    </svg>
+                                  )}
                                 </div>
-                                <div className={`leading-relaxed whitespace-pre-wrap break-words ${message.isUser ? 'text-white' : 'text-gray-800 dark:text-gray-200'}`}>
-                                  {message.text}
+                                <div className="flex-1">
+                                  <span className={`text-sm font-semibold ${message.isUser ? 'text-white' : 'text-gray-700 dark:text-gray-300'}`}>
+                                    {message.isUser ? 'You' : 'AI Assistant'}
+                                  </span>
+                                  <span className={`text-xs ml-2 ${message.isUser ? 'text-white/70' : 'text-gray-500 dark:text-gray-400'}`}>
+                                    {message.timestamp.toLocaleTimeString()}
+                                  </span>
                                 </div>
+                              </div>
+                              <div className={`leading-relaxed whitespace-pre-wrap break-words ${message.isUser ? 'text-white' : 'text-gray-800 dark:text-gray-200'}`}>
+                                {message.text}
                               </div>
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    )}
-                    
-                    {isAiTyping && (
-                      <div className="mr-8">
-                        <div className="bg-white dark:bg-gray-700 rounded-2xl p-4 shadow-sm border border-gray-200 dark:border-gray-600">
-                          <div className="flex items-center">
-                            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/50 dark:to-purple-900/50 flex items-center justify-center mr-3">
-                              <svg className="w-4 h-4 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                              </svg>
-                            </div>
-                            <div className="flex space-x-1">
-                              <div className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce"></div>
-                              <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                              <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                            </div>
-                            <span className="text-gray-600 dark:text-gray-400 ml-3 text-sm">AI is thinking...</span>
-                          </div>
                         </div>
-                      </div>
-                    )}
-                    <div ref={messagesEndRef} />
-                  </div>
-
-                  {/* Chat Input */}
-                  <div className="border-t border-gray-200/50 dark:border-gray-700/50 p-6 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-b-3xl">
-                    <div className="space-y-4">
-                      <div className="flex space-x-3">
-                        <div className="flex-1 relative">
-                          <textarea
-                            className="w-full resize-none border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 pr-12 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 bg-white/90 dark:bg-gray-700/90 backdrop-blur-sm shadow-sm"
-                            rows="3"
-                            placeholder="Ask me anything about this document..."
-                            value={inputMessage}
-                            onChange={(e) => setInputMessage(e.target.value)}
-                            onKeyPress={handleKeyPress}
-                            disabled={isAiTyping}
-                          />
-                          <button 
-                            onClick={handleSendMessage}
-                            disabled={!inputMessage.trim() || isAiTyping}
-                            className="absolute right-2 bottom-2 p-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg hover:from-indigo-600 hover:to-purple-700 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed transition-all duration-200 hover:scale-105 disabled:hover:scale-100 shadow-sm"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                            </svg>
-                          </button>
-                        </div>
-                      </div>
-                      
-                      {messages.length > 0 && (
-                        <div className="text-center">
-                          <button
-                            onClick={handleDownloadConversation}
-                            className="inline-flex items-center text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium transition-colors duration-200 hover:scale-105"
-                          >
-                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                            Download Conversation
-                          </button>
-                        </div>
-                      )}
+                      ))}
                     </div>
+                  )}
+                  
+                  {isAiTyping && (
+                    <div className="mr-8">
+                      <div className="bg-white dark:bg-gray-700 rounded-2xl p-4 shadow-sm border border-gray-200 dark:border-gray-600">
+                        <div className="flex items-center">
+                          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/50 dark:to-purple-900/50 flex items-center justify-center mr-3">
+                            <svg className="w-4 h-4 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>
+                          </div>
+                          <div className="flex space-x-1">
+                            <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
+                            <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                          </div>
+                          <span className="text-gray-600 dark:text-gray-400 ml-3 text-sm">AI is thinking...</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
+
+                {/* Chat Input */}
+                <div className="border-t border-gray-200/50 dark:border-gray-700/50 p-6 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-bl-3xl">
+                  <div className="space-y-4">
+                    <div className="flex space-x-3">
+                      <div className="flex-1 relative">
+                        <textarea
+                          className="w-full resize-none border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 pr-12 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 bg-white/90 dark:bg-gray-700/90 backdrop-blur-sm shadow-sm"
+                          rows="3"
+                          placeholder="Ask me anything about this document..."
+                          value={inputMessage}
+                          onChange={(e) => setInputMessage(e.target.value)}
+                          onKeyPress={handleKeyPress}
+                          disabled={isAiTyping}
+                        />
+                        <button 
+                          onClick={handleSendMessage}
+                          disabled={!inputMessage.trim() || isAiTyping}
+                          className="absolute right-2 bottom-2 p-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg hover:from-indigo-600 hover:to-purple-700 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed transition-all duration-200 hover:scale-105 disabled:hover:scale-100 shadow-sm"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                    
+                    {messages.length > 0 && (
+                      <div className="text-center">
+                        <button
+                          onClick={handleDownloadConversation}
+                          className="inline-flex items-center text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium transition-colors duration-200 hover:scale-105"
+                        >
+                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          Download Conversation
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
             </div>
-          )}
+          </div>
         </div>
       </div>
     </div>
