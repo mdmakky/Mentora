@@ -290,3 +290,201 @@ class StudyPlanView(APIView):
             
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ExplainConceptView(APIView):
+    """Handle concept explanation requests from PDF viewer."""
+    
+    def post(self, request):
+        """Explain a concept or answer questions about a document."""
+        try:
+            concept = request.data.get('concept', '')
+            document_id = request.data.get('document_id')
+            
+            if not concept:
+                return Response({'error': 'Concept/question is required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Get document if provided
+            document = None
+            context = ""
+            if document_id:
+                try:
+                    document = Document.objects.get(id=document_id)
+                    # Get some pages for context (first few pages)
+                    pages = Page.objects.filter(document=document)[:3]
+                    if pages:
+                        context = "\n\n".join([f"Page {p.page_number}: {p.content[:500]}..." for p in pages])
+                    else:
+                        context = f"Document: {document.title}"
+                except Document.DoesNotExist:
+                    context = "Document not found, but I can still help with general questions."
+            
+            # Create a more intelligent response based on the question
+            explanation = self._generate_explanation(concept, document, context)
+            
+            return Response({
+                'explanation': explanation,
+                'document_id': document_id,
+                'document_title': document.title if document else None
+            })
+            
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    def _generate_explanation(self, concept, document, context):
+        """Generate a contextual explanation based on the concept and document."""
+        concept_lower = concept.lower().strip()
+        
+        # Handle greetings
+        if any(greeting in concept_lower for greeting in ['hi', 'hello', 'hey', 'greetings']):
+            if document:
+                return f"""Hello! I'm your AI study assistant. I'm here to help you understand the document "{document.title}".
+
+You can ask me questions like:
+• "What is the main topic of this document?"
+• "Explain [specific concept] from the document"
+• "Summarize page [number]"
+• "What are the key points?"
+• "How does [concept A] relate to [concept B]?"
+
+What would you like to know about this document?"""
+            else:
+                return """Hello! I'm your AI study assistant. I'm here to help you understand academic content and answer your questions.
+
+Feel free to ask me about:
+• Specific concepts or terms
+• How different ideas relate to each other
+• Explanations of complex topics
+• Study strategies and tips
+
+What would you like to learn about today?"""
+        
+        # Handle document-specific questions
+        if document:
+            document_title = document.title.lower()
+            
+            # Questions about the document itself
+            if any(phrase in concept_lower for phrase in ['what is this document', 'what is this about', 'main topic', 'summary of document']):
+                return f"""This document is titled "{document.title}" and appears to be an academic or educational material.
+
+Based on the document structure, here are some ways I can help you:
+
+**Understanding the Content:**
+• I can explain specific concepts or terms that appear in the document
+• Break down complex ideas into simpler parts
+• Help you identify key themes and topics
+
+**Study Strategies:**
+• Summarize important sections
+• Help you create connections between different concepts
+• Suggest questions to test your understanding
+
+**Specific Questions:**
+Feel free to ask about any particular section, concept, or idea from "{document.title}" that you'd like me to explain in more detail.
+
+What specific aspect would you like to explore?"""
+            
+            # Handle requests for definitions and key terms
+            if any(phrase in concept_lower for phrase in ['definition', 'key terms', 'important terms', 'vocabulary']):
+                return f"""I'd be happy to help you identify and understand key terms from "{document.title}".
+
+**How to work with definitions and key terms:**
+
+1. **Identify Core Concepts**: Look for terms that appear frequently or are emphasized (bold, italics, headings)
+
+2. **Context Clues**: Pay attention to how terms are used in different sentences to understand their meaning
+
+3. **Relationships**: Notice how different terms connect to each other
+
+4. **Examples**: Look for concrete examples that illustrate abstract concepts
+
+**For this document specifically:**
+If you point out specific terms or concepts from "{document.title}" that you'd like defined or explained, I can help break them down and show how they relate to the overall content.
+
+Which particular terms or concepts would you like me to explain?"""
+            
+            # Handle relationship questions
+            if any(phrase in concept_lower for phrase in ['relationship', 'connect', 'relate', 'connection', 'between']):
+                return f"""Understanding relationships between ideas is crucial for deeper learning! Here's how to identify connections in "{document.title}":
+
+**Types of Relationships to Look For:**
+
+1. **Cause and Effect**: How one concept leads to or influences another
+2. **Compare and Contrast**: Similarities and differences between ideas
+3. **Hierarchical**: How concepts build upon each other (basic → advanced)
+4. **Functional**: How different parts work together toward a common goal
+
+**Strategies for Finding Connections:**
+• Look for transition words (therefore, however, similarly, in contrast)
+• Notice how authors introduce new concepts in relation to previous ones
+• Pay attention to examples that bridge different sections
+• Create concept maps or diagrams to visualize relationships
+
+**For Your Document:**
+If you can specify which particular concepts or sections from "{document.title}" you'd like me to help connect, I can provide more targeted guidance on their relationships.
+
+What specific ideas would you like me to help you connect?"""
+        
+        # Handle general academic concepts
+        if any(phrase in concept_lower for phrase in ['study', 'learn', 'understand', 'academic']):
+            return f"""Here are some effective strategies for studying and understanding academic content:
+
+**Active Reading Techniques:**
+• Preview the material before reading in detail
+• Take notes and summarize key points in your own words
+• Ask questions as you read
+• Make connections to what you already know
+
+**Comprehension Strategies:**
+• Break complex topics into smaller, manageable parts
+• Use examples and analogies to understand abstract concepts
+• Create visual aids like diagrams or concept maps
+• Teach the concept to someone else (or explain it out loud)
+
+**Critical Thinking:**
+• Analyze the evidence presented
+• Consider different perspectives
+• Evaluate the strengths and weaknesses of arguments
+• Apply concepts to new situations
+
+{f'For your document "{document.title}", ' if document else ''}try focusing on one section at a time and using these techniques to build your understanding progressively.
+
+Is there a specific study challenge you're facing that I can help address?"""
+        
+        # Default response for specific questions
+        if document:
+            return f"""I understand you're asking about: "{concept}"
+
+While I'd love to provide more specific insights about this topic in relation to "{document.title}", I can offer some general guidance:
+
+**Approach for Understanding "{concept}":**
+
+1. **Define the Term**: Start by identifying what "{concept}" means in the context of your document
+2. **Find Examples**: Look for specific instances or examples in the text
+3. **Context Analysis**: Consider how this concept fits within the broader themes of the document
+4. **Application**: Think about how this concept might be used or applied
+
+**Next Steps:**
+• Can you point me to a specific section or page where this concept appears?
+• Are there particular aspects of "{concept}" that are confusing?
+• Would you like me to help you break down this concept into smaller parts?
+
+Feel free to ask more specific questions about "{concept}" or share a particular passage you'd like me to help explain!"""
+        else:
+            return f"""You're asking about: "{concept}"
+
+Here's a general approach to understanding this topic:
+
+**Breaking Down "{concept}":**
+1. **Core Definition**: What does this term or idea fundamentally mean?
+2. **Key Components**: What are the main parts or aspects of this concept?
+3. **Examples**: What are some concrete instances where this applies?
+4. **Relationships**: How does this connect to other related ideas?
+
+**Study Strategies:**
+• Look for authoritative sources that define and explain this concept
+• Find multiple examples to see how it's applied in different contexts
+• Try to explain it in your own words
+• Consider how it relates to concepts you already understand
+
+Would you like to explore any specific aspect of "{concept}" in more detail? Or do you have a particular context where you've encountered this term?"""

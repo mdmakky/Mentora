@@ -1,0 +1,54 @@
+/* Theme Protection System - Prevents external dark mode extensions while preserving internal theme toggle */
+
+:root {
+  /* Internal theme management - these will be controlled by your React app */
+  --app-bg-light: #ffffff;
+  --app-bg-dark: #111827;
+  --app-text-light: #000000;
+  --app-text-dark: #ffffff;
+  
+  /* Force light mode by default - will be overridden by internal theme */
+  color-scheme: light;
+}
+
+/* Override external dark mode extensions' media query detection */
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Force light scheme even when system prefers dark */
+    color-scheme: light !important;
+    
+    /* Prevent extensions from detecting dark preference */
+    background-color: var(--app-bg-light) !important;
+    color: var(--app-text-light) !important;
+  }
+  
+  /* Only apply dark mode when explicitly set by our app */
+  html.dark {
+    color-scheme: dark !important;
+    background-color: var(--app-bg-dark) !important;
+    color: var(--app-text-dark) !important;
+  }
+}
+
+/* Block Dark Reader and similar extensions */
+html[data-darkreader-mode],
+html[data-darkreader-scheme] {
+  filter: none !important;
+}
+
+/* Only apply dark styles when our app explicitly sets .dark class */
+html:not(.dark) {
+  background-color: var(--app-bg-light) !important;
+  color: var(--app-text-light) !important;
+}
+
+html.dark {
+  background-color: var(--app-bg-dark) !important;
+  color: var(--app-text-dark) !important;
+}
+
+/* Prevent extensions from overriding our theme toggle */
+body {
+  background-color: inherit !important;
+  color: inherit !important;
+}
