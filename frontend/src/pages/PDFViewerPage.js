@@ -17,7 +17,7 @@ const PDFViewerPage = () => {
   
   const [document, setDocument] = useState(null);
   const [numPages, setNumPages] = useState(0);
-  const [scale, setScale] = useState(1.0);
+  const [scale, setScale] = useState(1.6);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -67,11 +67,11 @@ const PDFViewerPage = () => {
   };
 
   const handleZoomIn = () => {
-    setScale(prev => Math.min(prev + 0.1, 3.0));
+    setScale(prev => Math.min(prev + 0.16, 4.8));
   };
 
   const handleZoomOut = () => {
-    setScale(prev => Math.max(prev - 0.1, 0.5));
+    setScale(prev => Math.max(prev - 0.16, 0.8));
   };
 
   const handleSendMessage = async () => {
@@ -205,6 +205,21 @@ const PDFViewerPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 dark:from-gray-900 dark:via-slate-800 dark:to-gray-900 transition-all duration-500">
+      <style jsx>{`
+        .smooth-slide {
+          transition: all 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .smooth-transform {
+          transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .animate-fade-in {
+          animation: fadeIn 0.5s ease-out;
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: scale(0.8); }
+          to { opacity: 1; transform: scale(1); }
+        }
+      `}</style>
       {/* Background decorations */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-20 left-10 w-72 h-72 bg-gradient-to-br from-indigo-400/10 to-purple-400/10 rounded-full blur-3xl"></div>
@@ -212,7 +227,7 @@ const PDFViewerPage = () => {
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-gradient-to-br from-cyan-400/10 to-purple-400/10 rounded-full blur-3xl"></div>
       </div>
 
-      <div className={`relative max-w-7xl mx-auto px-4 py-8 transition-all duration-300 ${sidebarOpen ? 'mr-[25%] ml-[8%]' : ''}`}>
+      <div className={`relative max-w-7xl mx-auto px-4 py-8 smooth-slide ${sidebarOpen ? 'mr-[25%] ml-[8%]' : ''}`}>
         {/* Header - moves with content */}
         <div className="relative overflow-hidden mb-8">
           <div className="absolute -inset-4 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 rounded-3xl blur-2xl"></div>
@@ -257,7 +272,7 @@ const PDFViewerPage = () => {
                     </button>
                     
                     <span className="min-w-[70px] text-center text-sm font-medium px-3 py-1 bg-white/10 rounded-lg mx-1 text-white border border-white/20">
-                      {Math.round(scale * 100)}%
+                      {Math.round((scale / 1.6) * 100)}%
                     </span>
                     
                     <button 
@@ -270,20 +285,6 @@ const PDFViewerPage = () => {
                       </svg>
                     </button>
                   </div>
-                  
-                  <button 
-                    onClick={() => setSidebarOpen(!sidebarOpen)}
-                    className={`group p-3 rounded-xl transition-all duration-300 hover:scale-105 ${
-                      sidebarOpen 
-                        ? 'bg-white/20 text-white shadow-lg border border-white/30' 
-                        : 'bg-white/10 hover:bg-white/20 border border-white/20'
-                    }`}
-                    title={sidebarOpen ? "Hide AI Assistant" : "Show AI Assistant"}
-                  >
-                    <svg className="w-5 h-5 text-white transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                    </svg>
-                  </button>
                 </div>
               </div>
             </div>
@@ -291,13 +292,13 @@ const PDFViewerPage = () => {
         </div>
 
         {/* Main Content Layout */}
-        <div className="flex justify-center">
+        <div>
           {/* PDF Viewer Section */}
-          <div className="flex-1 max-w-5xl">
+          <div className="flex-1">
             <div className="relative overflow-hidden">
               <div className="absolute -inset-4 bg-gradient-to-r from-blue-500/10 via-indigo-500/10 to-purple-500/10 rounded-3xl blur-2xl"></div>
               <div className="relative bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-3xl border border-white/20 dark:border-gray-700/30 shadow-2xl overflow-hidden">
-                <div className="p-8">
+                <div className="p-6">
                   {document && (
                     <Document
                       file={`http://localhost:8001${document.file}`}
@@ -340,7 +341,7 @@ const PDFViewerPage = () => {
                         </div>
                       }
                     >
-                      <div className="space-y-8 max-w-4xl mx-auto">
+                      <div className="space-y-8">
                         {Array.from(new Array(numPages), (el, index) => (
                           <div 
                             key={`page_${index + 1}`} 
@@ -364,8 +365,8 @@ const PDFViewerPage = () => {
                                 </div>
                                 
                                 {/* Page Content */}
-                                <div className="p-6 flex justify-center bg-gray-50/30 dark:bg-gray-800/30">
-                                  <div className="shadow-lg rounded-lg overflow-hidden">
+                                <div className="p-4 bg-gray-50/30 dark:bg-gray-800/30 flex justify-center">
+                                  <div className="shadow-lg rounded-lg overflow-hidden max-w-full">
                                     <Page
                                       pageNumber={index + 1}
                                       scale={scale}
@@ -388,7 +389,7 @@ const PDFViewerPage = () => {
 
           {/* AI Chat Sidebar - Always rendered but positioned off-screen when closed */}
           <div 
-            className={`fixed top-0 right-0 h-screen w-[25%] z-50 transition-transform duration-300 ease-in-out ${
+            className={`fixed top-20 right-0 h-[calc(100vh-5rem)] w-[25%] z-50 smooth-transform ${
               sidebarOpen ? 'transform translate-x-0' : 'transform translate-x-full'
             }`}
           >
@@ -419,6 +420,15 @@ const PDFViewerPage = () => {
                         </svg>
                       </button>
                     )}
+                    <button 
+                      onClick={() => setSidebarOpen(false)}
+                      className="p-2.5 hover:bg-white/10 rounded-xl transition-all duration-200 hover:scale-105 group"
+                      title="Close Chat"
+                    >
+                      <svg className="w-5 h-5 text-white group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
                   </div>
                 </div>
 
@@ -509,7 +519,7 @@ const PDFViewerPage = () => {
                   
                   {isAiTyping && (
                     <div className="mr-8">
-                      <div className="bg-white dark:bg-gray-700 rounded-2xl p-4 shadow-sm border border-gray-200 dark:border-gray-600">
+                      <div className="bg-white dark:bg-gray-700 rounded-2xl p-4 shadow-xl shadow-gray-400/50 dark:shadow-gray-900/30 border border-gray-300/80 dark:border-gray-600 drop-shadow-lg">
                         <div className="flex items-center">
                           <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/50 dark:to-purple-900/50 flex items-center justify-center mr-3">
                             <svg className="w-4 h-4 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -535,7 +545,7 @@ const PDFViewerPage = () => {
                     <div className="flex space-x-3">
                       <div className="flex-1 relative">
                         <textarea
-                          className="w-full resize-none border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 pr-12 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 bg-white/90 dark:bg-gray-700/90 backdrop-blur-sm shadow-sm"
+                          className="w-full resize-none border border-gray-400/80 dark:border-gray-600 rounded-xl px-4 py-3 pr-12 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 bg-white/95 dark:bg-gray-700/90 backdrop-blur-sm shadow-xl shadow-gray-400/40 dark:shadow-gray-900/20 drop-shadow-lg"
                           rows="3"
                           placeholder="Ask me anything about this document..."
                           value={inputMessage}
@@ -574,6 +584,24 @@ const PDFViewerPage = () => {
             </div>
           </div>
         </div>
+
+        {/* Floating Chat Button - Bottom Right */}
+        {!sidebarOpen && (
+          <div className="fixed bottom-6 right-6 z-50 animate-fade-in">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="group w-16 h-16 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white rounded-full shadow-2xl shadow-indigo-400/60 dark:shadow-indigo-900/40 hover:shadow-2xl hover:shadow-indigo-500/70 dark:hover:shadow-indigo-900/50 transition-all duration-300 hover:scale-110 flex items-center justify-center drop-shadow-xl"
+              title="Open AI Chat"
+            >
+              <svg className="w-7 h-7 text-white transition-transform duration-200 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+              <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
+                <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+              </div>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
