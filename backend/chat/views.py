@@ -308,7 +308,7 @@ class ExplainConceptView(APIView):
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     def _generate_explanation(self, concept, document, context):
-        """Generate a contextual explanation based on the concept and document."""
+        """Generate a contextual explanation using RAG system."""
         concept_lower = concept.lower().strip()
         
         # Handle greetings
@@ -334,6 +334,71 @@ Feel free to ask me about:
 • Study strategies and tips
 
 What would you like to learn about today?"""
+        
+        # Use RAG system for all non-greeting queries
+        try:
+            from reader.vector_service import VectorStoreService
+            
+            # Initialize vector service
+            vector_service = VectorStoreService()
+            
+            # Determine document IDs to search
+            document_ids = []
+            if document:
+                document_ids = [str(document.id)]
+            else:
+                # Search all documents if no specific document
+                from reader.models import Document
+                all_docs = Document.objects.filter(is_processed=True)
+                document_ids = [str(doc.id) for doc in all_docs]
+            
+            print(f"DEBUG: Searching with document_ids: {document_ids}")
+            
+            # Get relevant context using RAG
+            search_results = vector_service.semantic_search(
+                query=concept,
+                document_ids=document_ids,
+                top_k=5
+            )
+            
+            print(f"DEBUG: Found {len(search_results)} search results")
+            
+            # Create context from search results
+            context_pieces = []
+            for result in search_results[:3]:  # Use top 3 results
+                content = result.get('content', '')
+                if content:
+                    context_pieces.append(content)
+            
+            context = '\n'.join(context_pieces)
+            
+            # Generate response based on context
+            if context.strip():
+                # For specific topics, provide detailed answers
+                if 'indicator' in concept_lower and 'titration' in concept_lower:
+                    return f"Based on your documents:\n\n{context[:800]}"
+                elif 'redox' in concept_lower and 'titration' in concept_lower:
+                    return f"Redox titration information from your documents:\n\n{context[:800]}"
+                elif any(term in concept_lower for term in ['application', 'uses', 'purpose']):
+                    return f"Applications and uses from your documents:\n\n{context[:800]}"
+                else:
+                    # General response with document context
+                    return f"Based on your uploaded documents:\n\n{context[:600]}"
+            else:
+                print("DEBUG: No context found, using fallback")
+                # Fallback to generic response if no context found
+                return self._generate_fallback_explanation(concept, document)
+                
+        except Exception as e:
+            print(f"RAG error in explanation: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            # Fallback to original method if RAG fails
+            return self._generate_fallback_explanation(concept, document)
+    
+    def _generate_fallback_explanation(self, concept, document):
+        """Fallback explanation method when RAG is not available."""
+        concept_lower = concept.lower().strip()
         
         # Handle document-specific questions
         if document:

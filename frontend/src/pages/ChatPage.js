@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import api from '../services/api';
+import api, { ragChat } from '../services/api';
 
 const ChatPage = () => {
   const [searchParams] = useSearchParams();
@@ -53,7 +53,7 @@ const ChatPage = () => {
   };
 
   const handleSendMessage = async () => {
-    if (!inputMessage.trim() || !currentSession || sending) return;
+    if (!inputMessage.trim() || sending) return;
 
     const message = inputMessage.trim();
     setInputMessage('');
@@ -69,24 +69,64 @@ const ChatPage = () => {
     setMessages(prev => [...prev, userMessage]);
 
     try {
-      const response = await api.post(`/chat/sessions/${currentSession.id}/messages/`, {
-        content: message,
-        document_id: documentId
-      });
+      // Always try RAG first - it will search across all documents
+      console.log('Using RAG chat for:', message);
+      
+      // Get all available documents to search across
+      const documentsResponse = await api.get('/reader/documents/');
+      const allDocuments = documentsResponse.data.documents || [];
+      const allDocumentIds = allDocuments.map(doc => doc.id);
+      
+      console.log('Searching across documents:', allDocumentIds);
+      
+      const ragResponse = await ragChat(message, allDocumentIds);
+      console.log('RAG response:', ragResponse.data);
+      
+      const aiResponse = {
+        id: Date.now().toString() + '_ai',
+        type: 'ai',
+        content: ragResponse.data.response || ragResponse.data.answer || 'I found some information in your documents, but had trouble formatting the response.',
+        timestamp: new Date().toISOString(),
+        context: ragResponse.data.context || null,
+        sources: ragResponse.data.sources || null,
+        sourceChunks: ragResponse.data.source_chunks || 0
+      };
       
       // Add AI response
-      const aiMessage = response.data.message;
-      setMessages(prev => [...prev, aiMessage]);
+      setMessages(prev => [...prev, aiResponse]);
+      
     } catch (error) {
-      console.error('Error sending message:', error);
-      // Add error message
-      const errorMessage = {
-        id: Date.now().toString(),
-        type: 'ai',
-        content: 'Sorry, I encountered an error. Please try again.',
-        timestamp: new Date().toISOString()
-      };
-      setMessages(prev => [...prev, errorMessage]);
+      console.error('RAG Error:', error);
+      
+      // Fallback to session-based chat if RAG fails
+      try {
+        if (currentSession) {
+          const response = await api.post(`/chat/sessions/${currentSession.id}/messages/`, {
+            content: message,
+            document_id: documentId
+          });
+          setMessages(prev => [...prev, response.data.message]);
+        } else {
+          // If no session, create one and try again
+          await createNewSession();
+          const fallbackMessage = {
+            id: Date.now().toString() + '_ai',
+            type: 'ai',
+            content: 'I had trouble accessing your documents. Please try asking again, or upload some documents first.',
+            timestamp: new Date().toISOString()
+          };
+          setMessages(prev => [...prev, fallbackMessage]);
+        }
+      } catch (fallbackError) {
+        console.error('Fallback error:', fallbackError);
+        const errorMessage = {
+          id: Date.now().toString() + '_ai',
+          type: 'ai',
+          content: 'Sorry, I encountered an error. Please make sure your documents are uploaded and try again.',
+          timestamp: new Date().toISOString()
+        };
+        setMessages(prev => [...prev, errorMessage]);
+      }
     } finally {
       setSending(false);
     }

@@ -104,4 +104,20 @@ export const generateSummary = (documentId, pageRange = null) => {
   });
 };
 
+// RAG (Retrieval Augmented Generation) functions
+export const ragChat = (query, documentIds = null) => {
+  return api.post('/reader/chat/', {
+    query,
+    document_ids: documentIds,
+  });
+};
+
+export const semanticSearch = (query, documentIds = null, topK = 5) => {
+  return api.post('/reader/search/', {
+    query,
+    document_ids: documentIds,
+    top_k: topK,
+  });
+};
+
 export default api;
