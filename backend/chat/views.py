@@ -8,6 +8,23 @@ from reader.models import Document, Page
 from reader.utils import PDFProcessor
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.schema import HumanMessage, SystemMessage, AIMessage
+import uuid
+
+
+def normalize_uuid(uuid_value):
+    """
+    Normalize UUID to standard string format with dashes.
+    Handles both UUID objects and string representations.
+    """
+    if isinstance(uuid_value, uuid.UUID):
+        return str(uuid_value)
+    elif isinstance(uuid_value, str):
+        # Remove any existing dashes and recreate with proper format
+        clean_uuid = uuid_value.replace('-', '')
+        if len(clean_uuid) == 32:
+            # Insert dashes at proper positions: 8-4-4-4-12
+            return f"{clean_uuid[:8]}-{clean_uuid[8:12]}-{clean_uuid[12:16]}-{clean_uuid[16:20]}-{clean_uuid[20:]}"
+    return str(uuid_value)
 from django.conf import settings
 
 
@@ -65,13 +82,16 @@ class ChatSessionView(APIView):
             sessions_data = []
             for session in sessions:
                 last_message = session.messages.last()
+                first_user_message = session.messages.filter(message_type='user').first()
+                
                 sessions_data.append({
                     'id': session.id,
                     'title': session.title,
                     'document_title': session.document.title if session.document else None,
                     'created_at': session.created_at,
                     'updated_at': session.updated_at,
-                    'last_message': last_message.content[:100] + '...' if last_message and len(last_message.content) > 100 else last_message.content if last_message else None
+                    'last_message': last_message.content[:100] + '...' if last_message and len(last_message.content) > 100 else last_message.content if last_message else None,
+                    'first_user_message': first_user_message.content[:80] + '...' if first_user_message and len(first_user_message.content) > 80 else first_user_message.content if first_user_message else None
                 })
             
             return Response({
@@ -200,7 +220,7 @@ class ChatMessageView(APIView):
             # Prepare document IDs for RAG search
             document_ids = []
             if session.document:
-                document_ids = [str(session.document.id)]
+                document_ids = [normalize_uuid(session.document.id)]
             
             # Get conversation history for context
             recent_messages = session.messages.order_by('-timestamp')[:6]  # Last 6 messages
@@ -437,12 +457,12 @@ What would you like to learn about today?"""
             # Determine document IDs to search
             document_ids = []
             if document:
-                document_ids = [str(document.id)]
+                document_ids = [normalize_uuid(document.id)]
             else:
                 # Search all documents if no specific document
                 from reader.models import Document
                 all_docs = Document.objects.filter(is_processed=True)
-                document_ids = [str(doc.id) for doc in all_docs]
+                document_ids = [normalize_uuid(doc.id) for doc in all_docs]
             
             print(f"DEBUG: Searching with document_ids: {document_ids}")
             

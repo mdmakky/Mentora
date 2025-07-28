@@ -291,14 +291,20 @@ class RAGService:
         """
         Get relevant context for a query to use with LLM.
         """
+        # Start with more results to ensure we get substantial context
         search_results = self.enhanced_search(query, document_ids)
         
         context_parts = []
         current_length = 0
+        min_useful_length = 20  # Reduced minimum length for a chunk to be considered useful
         
         for result in search_results['semantic_results']:
-            content = result['content']
+            content = result['content'].strip()
             metadata = result['metadata']
+            
+            # Skip very short or empty content chunks
+            if len(content) < min_useful_length:
+                continue
             
             # Format context with source information
             formatted_content = f"[Page {metadata['page_number']}]: {content}"
@@ -308,5 +314,30 @@ class RAGService:
                 
             context_parts.append(formatted_content)
             current_length += len(formatted_content)
+        
+        # If we don't have enough context, try getting more results
+        if current_length < 200 and len(context_parts) < 3:
+            # Get more results with a broader search
+            broader_search = self.vector_store.semantic_search(
+                query=query,
+                document_ids=document_ids,
+                top_k=20  # Get more results
+            )
+            
+            for result in broader_search:
+                if current_length >= max_context_length:
+                    break
+                    
+                content = result['content'].strip()
+                metadata = result['metadata']
+                
+                # Format context with source information
+                formatted_content = f"[Page {metadata['page_number']}]: {content}"
+                
+                # Avoid duplicates
+                if formatted_content not in context_parts:
+                    if current_length + len(formatted_content) <= max_context_length:
+                        context_parts.append(formatted_content)
+                        current_length += len(formatted_content)
         
         return "\n\n".join(context_parts)

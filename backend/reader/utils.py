@@ -75,8 +75,12 @@ class PDFProcessor:
         try:
             # Try to get relevant context from documents
             context = ""
+            context_found = False
             try:
-                context = self.rag_service.get_context_for_query(query, document_ids)
+                context = self.rag_service.get_context_for_query(query, document_ids, max_context_length=3000)
+                # Consider context useful if it has substantial content (more than just a few words)
+                if context and len(context.strip()) > 20:
+                    context_found = True
             except Exception as context_error:
                 print(f"Context retrieval failed: {context_error}")
                 # Continue without context - fallback to general AI response
@@ -89,12 +93,12 @@ class PDFProcessor:
                     role = "User" if msg.get('message_type') == 'user' else "Assistant"
                     history_context += f"{role}: {msg.get('content', '')}\n"
             
-            # Create enhanced prompt with context (if available)
-            if context.strip():
+            # Create enhanced prompt based on context availability
+            if context_found and context.strip():
                 prompt = f"""
-                You are an AI tutor helping students understand their study materials. Use the provided context to answer the question comprehensively.
+                You are an AI tutor helping students understand their study materials. Use the provided context from their documents to answer the question, but also supplement with your general knowledge when needed.
                 
-                Context from Documents:
+                Context from Student's Documents:
                 {context}
                 
                 Chat History:
@@ -103,16 +107,17 @@ class PDFProcessor:
                 Student Question: {query}
                 
                 Instructions:
-                - Use information from the provided context when relevant
-                - If the context doesn't contain sufficient information, say so clearly
-                - Provide educational explanations suitable for students
+                - Start by using information from the provided document context when relevant
+                - If the document context is incomplete or doesn't fully answer the question, supplement with additional educational information from your knowledge
+                - Clearly indicate when you're using document information vs. general knowledge
+                - Provide comprehensive, educational explanations suitable for students
                 - Reference specific pages when using information from the context
                 - Be encouraging and supportive in your tone
                 """
             else:
-                # Fallback prompt when no document context is available
+                # Enhanced fallback prompt when no useful document context is available
                 prompt = f"""
-                You are an AI tutor helping students with their questions. Answer the following question comprehensively and educationally.
+                You are an AI tutor helping students with their academic questions. While I don't have access to specific content from your documents that directly answers this question, I can provide comprehensive educational information on the topic.
                 
                 Chat History:
                 {history_context}
@@ -120,10 +125,12 @@ class PDFProcessor:
                 Student Question: {query}
                 
                 Instructions:
-                - Provide clear, educational explanations suitable for students
-                - Be encouraging and supportive in your tone
-                - If this seems like a specific academic topic, provide detailed information
+                - Provide clear, comprehensive educational explanations suitable for students
+                - Cover the topic thoroughly from an academic perspective
                 - Break down complex concepts into understandable parts
+                - Include relevant examples and applications when appropriate
+                - Be encouraging and supportive in your tone
+                - If this relates to a specific field of study, provide context about its importance in that field
                 """
             
             messages = [
