@@ -98,7 +98,17 @@ const PDFViewerPage = () => {
     setIsAiTyping(true);
 
     try {
-      const response = await explainConcept(inputMessage.trim(), documentId);
+      // Prepare chat history for better context understanding
+      const recentMessages = messages.slice(-6); // Last 6 messages for context
+      const chatHistory = recentMessages.map(msg => ({
+        message_type: msg.isUser ? 'user' : 'ai',
+        content: msg.text,
+        timestamp: msg.timestamp.toISOString()
+      }));
+      
+      console.log('PDFViewer chat history being sent:', chatHistory);
+      
+      const response = await explainConcept(inputMessage.trim(), documentId, chatHistory);
       
       const aiMessage = {
         id: (Date.now() + 1).toString(),

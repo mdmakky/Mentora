@@ -288,6 +288,7 @@ class ExplainConceptView(APIView):
         try:
             concept = request.data.get('concept', '')
             document_id = request.data.get('document_id')
+            chat_history = request.data.get('chat_history', [])
             
             if not concept:
                 return Response({'error': 'Concept/question is required'}, status=status.HTTP_400_BAD_REQUEST)
@@ -308,7 +309,7 @@ class ExplainConceptView(APIView):
                     context = "Document not found, but I can still help with general questions."
             
             # Create a more intelligent response based on the question
-            explanation = self._generate_explanation(concept, document, context)
+            explanation = self._generate_explanation(concept, document, context, chat_history)
             
             return Response({
                 'explanation': explanation,
@@ -319,9 +320,17 @@ class ExplainConceptView(APIView):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
-    def _generate_explanation(self, concept, document, context):
+    def _generate_explanation(self, concept, document, context, chat_history=None):
         """Generate a contextual explanation using RAG system."""
         concept_lower = concept.lower().strip()
+        
+        # Prepare chat history context
+        history_context = ""
+        if chat_history:
+            recent_history = chat_history[-6:]  # Last 3 exchanges
+            for msg in recent_history:
+                role = "User" if msg.get('message_type') == 'user' else "Assistant"
+                history_context += f"{role}: {msg.get('content', '')}\n"
         
         # Handle greetings
         if any(greeting in concept_lower for greeting in ['hi', 'hello', 'hey', 'greetings']):
@@ -349,10 +358,10 @@ What would you like to learn about today?"""
         
         # Use RAG system for all non-greeting queries
         try:
-            from reader.vector_service import VectorStoreService
+            from reader.utils import PDFProcessor
             
-            # Initialize vector service
-            vector_service = VectorStoreService()
+            # Initialize PDF processor with RAG capabilities
+            processor = PDFProcessor()
             
             # Determine document IDs to search
             document_ids = []
@@ -366,40 +375,20 @@ What would you like to learn about today?"""
             
             print(f"DEBUG: Searching with document_ids: {document_ids}")
             
-            # Get relevant context using RAG
-            search_results = vector_service.semantic_search(
-                query=concept,
-                document_ids=document_ids,
-                top_k=5
-            )
+            # Prepare chat history for RAG
+            rag_chat_history = []
+            if history_context:
+                for msg in chat_history[-6:]:  # Last 6 messages
+                    rag_chat_history.append({
+                        'message_type': msg.get('message_type', 'user'),
+                        'content': msg.get('content', ''),
+                        'timestamp': msg.get('timestamp', '')
+                    })
             
-            print(f"DEBUG: Found {len(search_results)} search results")
+            # Use RAG system with chat history support
+            response = processor.rag_chat_response(concept, document_ids, rag_chat_history)
             
-            # Create context from search results
-            context_pieces = []
-            for result in search_results[:3]:  # Use top 3 results
-                content = result.get('content', '')
-                if content:
-                    context_pieces.append(content)
-            
-            context = '\n'.join(context_pieces)
-            
-            # Generate response based on context
-            if context.strip():
-                # For specific topics, provide detailed answers
-                if 'indicator' in concept_lower and 'titration' in concept_lower:
-                    return f"Based on your documents:\n\n{context[:800]}"
-                elif 'redox' in concept_lower and 'titration' in concept_lower:
-                    return f"Redox titration information from your documents:\n\n{context[:800]}"
-                elif any(term in concept_lower for term in ['application', 'uses', 'purpose']):
-                    return f"Applications and uses from your documents:\n\n{context[:800]}"
-                else:
-                    # General response with document context
-                    return f"Based on your uploaded documents:\n\n{context[:600]}"
-            else:
-                print("DEBUG: No context found, using fallback")
-                # Fallback to generic response if no context found
-                return self._generate_fallback_explanation(concept, document)
+            return response
                 
         except Exception as e:
             print(f"RAG error in explanation: {str(e)}")

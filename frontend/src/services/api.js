@@ -65,10 +65,11 @@ export const sendMessage = (sessionId, content, documentId = null) => {
   });
 };
 
-export const explainConcept = (concept, documentId) => {
+export const explainConcept = (concept, documentId, chatHistory = null) => {
   return api.post('/chat/explain/', {
     concept,
     document_id: documentId,
+    chat_history: chatHistory,
   });
 };
 
@@ -109,10 +110,11 @@ export const generateSummary = (documentId, pageRange = null) => {
 };
 
 // RAG (Retrieval Augmented Generation) functions
-export const ragChat = (query, documentIds = null) => {
+export const ragChat = (query, documentIds = null, chatHistory = null) => {
   return api.post('/reader/chat/', {
     query,
     document_ids: documentIds,
+    chat_history: chatHistory,
   });
 };
 

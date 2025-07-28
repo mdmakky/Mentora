@@ -104,8 +104,24 @@ const ChatPage = () => {
       
       console.log('Searching across documents:', allDocumentIds);
       
-      const ragResponse = await ragChat(message, allDocumentIds);
-      console.log('RAG response:', ragResponse.data);
+      // Prepare chat history for better context understanding (exclude the current user message)
+      const messagesBeforeCurrent = messages.slice(0, -1); // Exclude the current user message
+      const recentMessages = messagesBeforeCurrent.slice(-6); // Last 6 messages for context
+      const chatHistory = recentMessages.map(msg => ({
+        message_type: msg.type,
+        content: msg.content,
+        timestamp: msg.timestamp
+      }));
+      
+      console.log('Chat history being sent:', chatHistory);
+      
+      const ragResponse = await ragChat(message, allDocumentIds, chatHistory);
+      console.log('RAG response:', ragResponse);
+      console.log('RAG response data:', ragResponse.data);
+      
+      if (!ragResponse || !ragResponse.data) {
+        throw new Error('Invalid response from RAG service');
+      }
       
       const aiResponse = {
         id: Date.now().toString() + '_ai',
