@@ -176,3 +176,14 @@ a:focus-visible {
 html {
   scroll-behavior: smooth;
 }
+
+/* Chat page specific no-scroll class */
+body.chat-page-active {
+  height: 100vh;
+  overflow: hidden;
+}
+
+html:has(body.chat-page-active) {
+  height: 100vh;
+  overflow: hidden;
+}

@@ -58,10 +58,11 @@ export const getChatMessages = (sessionId) => {
   return api.get(`/chat/sessions/${sessionId}/messages/`);
 };
 
-export const sendMessage = (sessionId, content, documentId = null) => {
+export const sendMessage = (sessionId, content, documentId = null, searchDocuments = false) => {
   return api.post(`/chat/sessions/${sessionId}/messages/`, {
     content,
     document_id: documentId,
+    search_documents: searchDocuments,
   });
 };
 

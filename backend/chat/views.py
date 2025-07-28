@@ -9,6 +9,12 @@ from reader.utils import PDFProcessor
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.schema import HumanMessage, SystemMessage, AIMessage
 import uuid
+from .prompts import (
+    should_search_documents, 
+    is_elaboration_request, 
+    build_system_prompt,
+    get_conversation_context
+)
 
 
 def normalize_uuid(uuid_value):
@@ -124,6 +130,7 @@ class ChatMessageView(APIView):
             session = get_object_or_404(ChatSession, id=session_id)
             user_message = request.data.get('message') or request.data.get('content')
             page_number = request.data.get('page_number')
+            search_documents = request.data.get('search_documents', False)  # New parameter
             
             if not user_message:
                 return Response({'error': 'Message is required'}, status=status.HTTP_400_BAD_REQUEST)
@@ -145,8 +152,8 @@ class ChatMessageView(APIView):
                 except Page.DoesNotExist:
                     pass
             
-            # Generate AI response
-            ai_response = self._generate_ai_response(session, user_message, page_number)
+            # Generate AI response with document search preference
+            ai_response = self._generate_ai_response(session, user_message, page_number, search_documents)
             
             # Save AI response
             ai_msg = ChatMessage.objects.create(
@@ -211,39 +218,133 @@ class ChatMessageView(APIView):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
-    def _generate_ai_response(self, session, user_message, page_number=None):
-        """Generate AI response using RAG (Retrieval Augmented Generation)."""
+    def _generate_ai_response(self, session, user_message, page_number=None, search_documents=False):
+        """Generate context-aware AI response."""
         try:
-            # Get the PDF processor with RAG capabilities
-            processor = PDFProcessor()
-            
-            # Prepare document IDs for RAG search
-            document_ids = []
-            if session.document:
-                document_ids = [normalize_uuid(session.document.id)]
-            
             # Get conversation history for context
-            recent_messages = session.messages.order_by('-timestamp')[:6]  # Last 6 messages
+            recent_messages = session.messages.order_by('-timestamp')[:10]  # Last 10 messages
             chat_history = []
             
             for msg in reversed(recent_messages):
                 chat_history.append({
-                    'message_type': msg.message_type,
-                    'content': msg.content,
-                    'timestamp': msg.timestamp.isoformat()
+                    'role': 'user' if msg.message_type == 'user' else 'assistant',
+                    'content': msg.content
                 })
             
-            # Use RAG to generate response
-            ai_response = processor.rag_chat_response(
-                query=user_message,
-                document_ids=document_ids,
-                chat_history=chat_history
+            # Determine if we should search documents based on toggle or keywords
+            should_search = search_documents or should_search_documents(user_message, chat_history)
+            
+            # Initialize document context
+            document_context = None
+            
+            # Search documents if requested and available
+            if should_search:
+                if session.document:
+                    processor = PDFProcessor()
+                    document_ids = [normalize_uuid(session.document.id)]
+                    
+                    # Get relevant document chunks
+                    search_results = processor.semantic_query(user_message, document_ids)
+                    if search_results.get('semantic_results'):
+                        contexts = []
+                        for result in search_results['semantic_results'][:5]:  # Top 5 results
+                            contexts.append(result['content'])
+                        document_context = "\n\n".join(contexts)
+                elif search_documents:  # User explicitly requested document search but no document attached
+                    # Try to search through all available documents for this user
+                    from reader.models import Document
+                    user = session.user
+                    available_docs = Document.objects.filter(user=user, is_processed=True)
+                    
+                    if available_docs.exists():
+                        processor = PDFProcessor()
+                        document_ids = [str(doc.id) for doc in available_docs]
+                        
+                        # Search through all user's documents
+                        search_results = processor.semantic_query(user_message, document_ids)
+                        if search_results.get('semantic_results'):
+                            contexts = []
+                            for result in search_results['semantic_results'][:5]:  # Top 5 results
+                                contexts.append(result['content'])
+                            document_context = "\n\n".join(contexts)
+                    
+                    if not document_context:
+                        # No documents available or no relevant content found
+                        doc_count = available_docs.count()
+                        if doc_count == 0:
+                            return "I don't have access to any documents. Please upload some documents first to enable document search."
+                        else:
+                            doc_titles = list(available_docs.values_list('title', flat=True)[:3])  # Show up to 3 document names
+                            title_list = ", ".join(doc_titles)
+                            if doc_count > 3:
+                                title_list += f" (and {doc_count - 3} more)"
+                            return f"I searched through your {doc_count} document(s) including '{title_list}' but couldn't find information relevant to your question. Try asking about topics covered in these documents or rephrasing your question."
+            
+            # Build appropriate system prompt
+            system_prompt = self._build_custom_system_prompt(user_message, chat_history, document_context, search_documents)
+            
+            # Generate response using Google Generative AI
+            llm = ChatGoogleGenerativeAI(
+                model="gemini-1.5-flash",
+                google_api_key=settings.GOOGLE_API_KEY,
+                temperature=0.7
             )
             
-            return ai_response
+            # Create messages for the LLM
+            messages = [
+                SystemMessage(content=system_prompt),
+            ]
+            
+            # Add recent conversation context (last 6 messages)
+            for msg in chat_history[-6:]:
+                if msg['role'] == 'user':
+                    messages.append(HumanMessage(content=msg['content']))
+                else:
+                    messages.append(AIMessage(content=msg['content']))
+            
+            # Add current user message
+            messages.append(HumanMessage(content=user_message))
+            
+            # Generate response
+            response = llm.invoke(messages)
+            return response.content
             
         except Exception as e:
             return f"I apologize, but I encountered an error while processing your request. Please try again. Error: {str(e)}"
+    
+    def _build_custom_system_prompt(self, user_message, chat_history, document_context, search_documents):
+        """Build system prompt based on whether document search is enabled."""
+        base_prompt = """You are Mentora, an AI study assistant. You are helpful, friendly, and concise.
+
+Key behaviors:
+- Be conversational and friendly, like a study buddy
+- Keep responses concise unless specifically asked for detailed explanations
+- Use simple, clear language appropriate for students
+- Maintain conversation context and refer to previous messages when relevant
+- Be encouraging and supportive in your responses
+
+Response length guidelines:
+- Default: 1-3 sentences for simple questions
+- Use "Would you like me to explain more?" to offer additional detail
+- Only give detailed explanations when asked for "detailed", "elaborate", "explain in detail", etc.
+"""
+
+        if search_documents and document_context:
+            base_prompt += """
+DOCUMENT SEARCH MODE: The user has enabled document search. Use the provided document context to answer their question accurately. Base your response primarily on the document content while maintaining a helpful, educational tone.
+
+Document context:
+""" + document_context
+        elif search_documents and not document_context:
+            base_prompt += """
+DOCUMENT SEARCH MODE: The user requested document search, but no relevant content was found. Inform them politely that no relevant information was found in the attached documents for their query.
+"""
+        else:
+            base_prompt += """
+GENERAL KNOWLEDGE MODE: Answer using your built-in knowledge. Do not search or reference documents unless the user specifically mentions them.
+"""
+        
+        return base_prompt
     
     def _update_session_title(self, session, first_user_message):
         """Generate and update session title based on the first user message."""
