@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import api, { ragChat } from '../services/api';
+import api, { ragChat, deleteChatSession } from '../services/api';
 
 const ChatPage = () => {
   const [searchParams] = useSearchParams();
@@ -12,6 +12,15 @@ const ChatPage = () => {
   const [inputMessage, setInputMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const messagesEndRef = useRef(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
   useEffect(() => {
     loadSessions();
@@ -40,6 +49,22 @@ const ChatPage = () => {
       setMessages([]);
     } catch (error) {
       console.error('Error creating session:', error);
+    }
+  };
+
+  const deleteSession = async (sessionId, event) => {
+    event.stopPropagation(); // Prevent triggering the session click
+    try {
+      await deleteChatSession(sessionId);
+      setSessions(prev => prev.filter(session => session.id !== sessionId));
+      
+      // If the deleted session was the current one, clear it
+      if (currentSession?.id === sessionId) {
+        setCurrentSession(null);
+        setMessages([]);
+      }
+    } catch (error) {
+      console.error('Error deleting session:', error);
     }
   };
 
@@ -91,7 +116,7 @@ const ChatPage = () => {
         sources: ragResponse.data.sources || null,
         sourceChunks: ragResponse.data.source_chunks || 0
       };
-      
+
       // Add AI response
       setMessages(prev => [...prev, aiResponse]);
       
@@ -144,7 +169,7 @@ const ChatPage = () => {
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-gray-100 dark:from-gray-900 dark:to-slate-800 flex items-center justify-center transition-colors duration-300">
         <div className="text-center">
           <div className="relative mb-8">
-            <div className="w-16 h-16 border-4 border-indigo-200 dark:border-gray-600 border-t-indigo-600 dark:border-t-indigo-400 rounded-full mx-auto"></div>
+            <div className="w-16 h-16 border-4 border-indigo-200 dark:border-gray-600 border-t-indigo-600 dark:border-t-indigo-400 rounded-full mx-auto animate-spin"></div>
           </div>
           <p className="text-lg font-medium text-gray-700 dark:text-gray-300">Loading your chat sessions...</p>
         </div>
@@ -176,7 +201,7 @@ const ChatPage = () => {
           </button>
         </div>
         
-        <div className="overflow-y-auto flex-1">
+        <div className="overflow-y-auto flex-1" style={{maxHeight: 'calc(100vh - 180px)'}}>
           {sessions.length === 0 ? (
             <div className="p-6 text-center">
               <div className="w-16 h-16 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -188,20 +213,21 @@ const ChatPage = () => {
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Start your first conversation</p>
             </div>
           ) : (
-            sessions.map((session) => (
+            sessions.filter(session => session && session.id).map((session) => (
               <div
                 key={session.id}
-                onClick={() => {
-                  setCurrentSession(session);
-                  loadMessages(session.id);
-                }}
                 className={`group p-4 mx-3 my-2 rounded-xl cursor-pointer transition-all duration-200 ${
                   currentSession?.id === session.id 
                     ? 'bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/50 dark:to-purple-900/50 border-2 border-indigo-200 dark:border-indigo-600 shadow-md' 
                     : 'bg-white/50 dark:bg-gray-700/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-600/50 hover:bg-white/70 dark:hover:bg-gray-700/70 hover:shadow-md'
                 }`}
               >
-                <div className="flex items-start">
+                <div className="flex items-start" onClick={() => {
+                  if (session && session.id) {
+                    setCurrentSession(session);
+                    loadMessages(session.id);
+                  }
+                }}>
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center mr-3 ${
                     currentSession?.id === session.id 
                       ? 'bg-gradient-to-br from-indigo-500 to-purple-600' 
@@ -212,13 +238,13 @@ const ChatPage = () => {
                     </svg>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-gray-900 dark:text-gray-100 truncate text-sm">{session.title}</h3>
+                    <h3 className="font-semibold text-gray-900 dark:text-gray-100 truncate text-sm">{session.title || 'Untitled Chat'}</h3>
                     <div className="flex items-center mt-1">
                       <svg className="w-3 h-3 text-gray-400 dark:text-gray-500 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3a1 1 0 011-1h6a1 1 0 011 1v4m-6 0v1m6-1v1m-6 0H6a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V9a2 2 0 00-2-2h-3" />
                       </svg>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
-                        {new Date(session.created_at).toLocaleDateString()}
+                        {session.created_at ? new Date(session.created_at).toLocaleDateString() : 'Unknown date'}
                       </p>
                     </div>
                     {session.last_message && (
@@ -227,6 +253,15 @@ const ChatPage = () => {
                       </p>
                     )}
                   </div>
+                  <button
+                    onClick={(event) => deleteSession(session.id, event)}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg ml-2"
+                    title="Delete session"
+                  >
+                    <svg className="w-4 h-4 text-red-500 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
                 </div>
               </div>
             ))
@@ -276,9 +311,9 @@ const ChatPage = () => {
                   </div>
                   <div>
                     <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
-                      {currentSession.title}
+                      {currentSession?.title || 'Chat Session'}
                     </h2>
-                    {currentSession.document_title && (
+                    {currentSession?.document_title && (
                       <div className="flex items-center mt-1">
                         <svg className="w-4 h-4 text-gray-500 dark:text-gray-400 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -294,7 +329,7 @@ const ChatPage = () => {
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-gradient-to-br from-slate-50/50 to-gray-100/50 dark:from-gray-900/50 dark:to-slate-800/50">
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-gradient-to-br from-slate-50/50 to-gray-100/50 dark:from-gray-900/50 dark:to-slate-800/50" style={{maxHeight: 'calc(100vh - 240px)'}}>
               {messages.length === 0 ? (
                 <div className="text-center py-12">
                   <div className="w-16 h-16 bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/50 dark:to-purple-900/50 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -306,46 +341,49 @@ const ChatPage = () => {
                   <p className="text-gray-600 dark:text-gray-300">Ask me anything about your documents or any topic you'd like to explore!</p>
                 </div>
               ) : (
-                messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div className={`flex items-start max-w-xs lg:max-w-2xl ${message.type === 'user' ? 'flex-row-reverse' : ''}`}>
-                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                        message.type === 'user' 
-                          ? 'bg-gradient-to-br from-indigo-500 to-purple-600 ml-3' 
-                          : 'bg-gradient-to-br from-green-500 to-emerald-600 mr-3'
-                      }`}>
-                        {message.type === 'user' ? (
-                          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                          </svg>
-                        ) : (
-                          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                          </svg>
-                        )}
-                      </div>
-                      <div
-                        className={`px-4 py-3 rounded-2xl shadow-sm ${
-                          message.type === 'user'
-                            ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white'
-                            : 'bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-600/50 text-gray-900 dark:text-gray-100'
-                        }`}
-                      >
-                        <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
-                        <p
-                          className={`text-xs mt-2 ${
-                            message.type === 'user' ? 'text-indigo-100' : 'text-gray-500 dark:text-gray-400'
+                <>
+                  {messages.map((message) => (
+                    <div
+                      key={message.id}
+                      className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div className={`flex items-start max-w-xs lg:max-w-2xl ${message.type === 'user' ? 'flex-row-reverse' : ''}`}>
+                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                          message.type === 'user' 
+                            ? 'bg-gradient-to-br from-indigo-500 to-purple-600 ml-3' 
+                            : 'bg-gradient-to-br from-green-500 to-emerald-600 mr-3'
+                        }`}>
+                          {message.type === 'user' ? (
+                            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                          ) : (
+                            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>
+                          )}
+                        </div>
+                        <div
+                          className={`px-4 py-3 rounded-2xl shadow-sm ${
+                            message.type === 'user'
+                              ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white'
+                              : 'bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-600/50 text-gray-900 dark:text-gray-100'
                           }`}
                         >
-                          {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </p>
+                          <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                          <p
+                            className={`text-xs mt-2 ${
+                              message.type === 'user' ? 'text-indigo-100' : 'text-gray-500 dark:text-gray-400'
+                            }`}
+                          >
+                            {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
+                  ))}
+                  <div ref={messagesEndRef} />
+                </>
               )}
               
               {sending && (
@@ -358,9 +396,9 @@ const ChatPage = () => {
                     </div>
                     <div className="bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-600/50 text-gray-900 dark:text-gray-100 px-4 py-3 rounded-2xl shadow-sm">
                       <div className="flex items-center space-x-1">
-                        <div className="w-2 h-2 bg-gray-400 dark:bg-gray-300 rounded-full"></div>
-                        <div className="w-2 h-2 bg-gray-400 dark:bg-gray-300 rounded-full"></div>
-                        <div className="w-2 h-2 bg-gray-400 dark:bg-gray-300 rounded-full"></div>
+                        <div className="w-2 h-2 bg-gray-400 dark:bg-gray-300 rounded-full animate-bounce"></div>
+                        <div className="w-2 h-2 bg-gray-400 dark:bg-gray-300 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                        <div className="w-2 h-2 bg-gray-400 dark:bg-gray-300 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
                       </div>
                     </div>
                   </div>
@@ -369,7 +407,7 @@ const ChatPage = () => {
             </div>
 
             {/* Input */}
-            <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-t border-gray-200/50 dark:border-gray-700/50 p-6 shadow-lg">
+            <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-t border-gray-200/50 dark:border-gray-700/50 p-6 shadow-lg sticky bottom-0">
               <div className="max-w-4xl mx-auto">
                 <div className="flex space-x-4">
                   <div className="flex-1 relative">
@@ -392,7 +430,7 @@ const ChatPage = () => {
                     className="bg-gradient-to-r from-indigo-500 to-purple-600 dark:from-indigo-600 dark:to-purple-700 text-white px-6 py-3 rounded-2xl hover:from-indigo-600 hover:to-purple-700 dark:hover:from-indigo-700 dark:hover:to-purple-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 self-end shadow-lg flex items-center justify-center min-w-[80px]"
                   >
                     {sending ? (
-                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"></div>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     ) : (
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />

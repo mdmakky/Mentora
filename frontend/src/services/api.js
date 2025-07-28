@@ -50,6 +50,10 @@ export const createChatSession = (title, documentId = null) => {
   });
 };
 
+export const deleteChatSession = (sessionId) => {
+  return api.delete(`/chat/sessions/${sessionId}/`);
+};
+
 export const getChatMessages = (sessionId) => {
   return api.get(`/chat/sessions/${sessionId}/messages/`);
 };

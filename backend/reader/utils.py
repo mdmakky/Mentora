@@ -63,13 +63,23 @@ class PDFProcessor:
         """
         Perform semantic search on documents - implements the User Query → Embedding → Search flow.
         """
+        try:
+            return self.rag_service.enhanced_search(query, document_ids)
+        except Exception as e:
+            print(f"Semantic query error: {e}")
+            return {'semantic_results': [], 'query': query, 'total_results': 0}
     def rag_chat_response(self, query: str, document_ids: List[str] = None, chat_history: List[Dict] = None) -> str:
         """
         Generate AI response using RAG - implements the System Query (Pages + User Query) → LLM → Final Output flow.
         """
         try:
-            # Get relevant context from documents
-            context = self.rag_service.get_context_for_query(query, document_ids)
+            # Try to get relevant context from documents
+            context = ""
+            try:
+                context = self.rag_service.get_context_for_query(query, document_ids)
+            except Exception as context_error:
+                print(f"Context retrieval failed: {context_error}")
+                # Continue without context - fallback to general AI response
             
             # Prepare chat history context
             history_context = ""
@@ -79,25 +89,42 @@ class PDFProcessor:
                     role = "User" if msg.get('message_type') == 'user' else "Assistant"
                     history_context += f"{role}: {msg.get('content', '')}\n"
             
-            # Create enhanced prompt with context
-            prompt = f"""
-            You are an AI tutor helping students understand their study materials. Use the provided context to answer the question comprehensively.
-            
-            Context from Documents:
-            {context}
-            
-            Chat History:
-            {history_context}
-            
-            Student Question: {query}
-            
-            Instructions:
-            - Use information from the provided context when relevant
-            - If the context doesn't contain sufficient information, say so clearly
-            - Provide educational explanations suitable for students
-            - Reference specific pages when using information from the context
-            - Be encouraging and supportive in your tone
-            """
+            # Create enhanced prompt with context (if available)
+            if context.strip():
+                prompt = f"""
+                You are an AI tutor helping students understand their study materials. Use the provided context to answer the question comprehensively.
+                
+                Context from Documents:
+                {context}
+                
+                Chat History:
+                {history_context}
+                
+                Student Question: {query}
+                
+                Instructions:
+                - Use information from the provided context when relevant
+                - If the context doesn't contain sufficient information, say so clearly
+                - Provide educational explanations suitable for students
+                - Reference specific pages when using information from the context
+                - Be encouraging and supportive in your tone
+                """
+            else:
+                # Fallback prompt when no document context is available
+                prompt = f"""
+                You are an AI tutor helping students with their questions. Answer the following question comprehensively and educationally.
+                
+                Chat History:
+                {history_context}
+                
+                Student Question: {query}
+                
+                Instructions:
+                - Provide clear, educational explanations suitable for students
+                - Be encouraging and supportive in your tone
+                - If this seems like a specific academic topic, provide detailed information
+                - Break down complex concepts into understandable parts
+                """
             
             messages = [
                 SystemMessage(content="You are a helpful AI tutor specializing in explaining academic content clearly."),
@@ -108,7 +135,17 @@ class PDFProcessor:
             return response.content
             
         except Exception as e:
-            return f"I apologize, but I encountered an error while processing your question: {str(e)}"
+            # Final fallback - simple direct response
+            try:
+                simple_prompt = f"As an AI tutor, please answer this student's question: {query}"
+                messages = [
+                    SystemMessage(content="You are a helpful AI tutor."),
+                    HumanMessage(content=simple_prompt)
+                ]
+                response = self.llm.invoke(messages)
+                return response.content
+            except:
+                return f"I apologize, but I'm currently experiencing technical difficulties. Please try asking your question again."
 
     def extract_pdf_text(self, pdf_file_path: str) -> Dict[str, Any]:
         """Extract text from PDF with page-wise content."""

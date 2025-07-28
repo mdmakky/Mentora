@@ -81,6 +81,18 @@ class ChatSessionView(APIView):
             
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    def delete(self, request, session_id=None):
+        """Delete a chat session."""
+        try:
+            if session_id:
+                session = get_object_or_404(ChatSession, id=session_id)
+                session.delete()
+                return Response({'message': 'Session deleted successfully'}, status=status.HTTP_200_OK)
+            else:
+                return Response({'error': 'Session ID is required'}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class ChatMessageView(APIView):
@@ -90,7 +102,7 @@ class ChatMessageView(APIView):
         """Send a message and get AI response."""
         try:
             session = get_object_or_404(ChatSession, id=session_id)
-            user_message = request.data.get('message')
+            user_message = request.data.get('message') or request.data.get('content')
             page_number = request.data.get('page_number')
             
             if not user_message:
