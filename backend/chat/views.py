@@ -136,6 +136,16 @@ class ChatMessageView(APIView):
                 page_reference=user_msg.page_reference
             )
             
+            # Update session title if this is the first user message
+            user_message_count = session.messages.filter(message_type='user').count()
+            print(f"User message count: {user_message_count}, Session title: {session.title}")
+            
+            if user_message_count == 1 and session.title == 'New Chat Session':
+                print("Triggering title update...")
+                self._update_session_title(session, user_message)
+            else:
+                print(f"Not updating title - count: {user_message_count}, title: {session.title}")
+            
             # Update session timestamp
             session.save()
             
@@ -214,6 +224,67 @@ class ChatMessageView(APIView):
             
         except Exception as e:
             return f"I apologize, but I encountered an error while processing your request. Please try again. Error: {str(e)}"
+    
+    def _update_session_title(self, session, first_user_message):
+        """Generate and update session title based on the first user message."""
+        try:
+            print(f"Updating session title for message: {first_user_message}")
+            
+            # Use AI to generate a concise title
+            llm = ChatGoogleGenerativeAI(
+                model="gemini-1.5-flash",
+                google_api_key=settings.GOOGLE_API_KEY,
+                temperature=0.3
+            )
+            
+            prompt = f"""
+            Generate a short, descriptive title (maximum 4-5 words) for a chat session based on this first message:
+            
+            Message: "{first_user_message}"
+            
+            The title should capture the main topic or subject being discussed. Examples:
+            - "Physics Concepts Help"
+            - "Math Problem Solving"
+            - "History Essay Questions"
+            - "Chemistry Lab Analysis"
+            
+            Only return the title, nothing else.
+            """
+            
+            messages = [HumanMessage(content=prompt)]
+            response = llm.invoke(messages)
+            
+            # Clean up the title
+            title = response.content.strip().replace('"', '').replace("'", '')
+            
+            # Ensure it's not too long
+            if len(title) > 50:
+                title = title[:47] + "..."
+            
+            print(f"Generated title: {title}")
+            
+            # Update session title
+            session.title = title
+            session.save()
+            
+            print(f"Session title updated successfully to: {session.title}")
+            
+        except Exception as e:
+            print(f"Error updating session title: {e}")
+            import traceback
+            traceback.print_exc()
+            
+            # Fallback: Create simple title from first few words
+            try:
+                words = first_user_message.split()[:3]
+                fallback_title = ' '.join(words).title()
+                if len(fallback_title) > 30:
+                    fallback_title = fallback_title[:27] + "..."
+                session.title = fallback_title
+                session.save()
+                print(f"Used fallback title: {fallback_title}")
+            except:
+                print("Fallback title generation also failed, keeping default title")
 
 
 class StudyPlanView(APIView):

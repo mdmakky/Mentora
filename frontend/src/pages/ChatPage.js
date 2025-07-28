@@ -39,14 +39,37 @@ const ChatPage = () => {
 
   const createNewSession = async () => {
     try {
+      console.log('Creating new session...');
       const response = await api.post('/chat/sessions/', {
         title: 'New Chat Session',
         document_id: documentId
       });
-      const newSession = response.data.session;
+      console.log('Session created:', response.data);
+      
+      // Backend returns session_id, title, document_id directly, not nested in a session object
+      const newSession = {
+        id: response.data.session_id,
+        title: response.data.title,
+        document_title: null, // Will be filled when we reload sessions
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        last_message: null
+      };
+      
       setSessions(prev => [newSession, ...prev]);
       setCurrentSession(newSession);
-      setMessages([]);
+      setMessages([]); // Clear messages immediately for new session
+      
+      console.log('New session set as current:', newSession);
+      
+      // Try to load messages, but don't block if it fails
+      try {
+        await loadMessages(newSession.id);
+        console.log('Messages loaded for new session');
+      } catch (loadError) {
+        console.error('Error loading messages for new session (continuing anyway):', loadError);
+        // Continue anyway since it's a new session with no messages
+      }
     } catch (error) {
       console.error('Error creating session:', error);
     }
@@ -55,7 +78,10 @@ const ChatPage = () => {
   const deleteSession = async (sessionId, event) => {
     event.stopPropagation(); // Prevent triggering the session click
     try {
+      console.log('Deleting session:', sessionId);
       await deleteChatSession(sessionId);
+      
+      // Update sessions list
       setSessions(prev => prev.filter(session => session.id !== sessionId));
       
       // If the deleted session was the current one, clear it
@@ -63,22 +89,31 @@ const ChatPage = () => {
         setCurrentSession(null);
         setMessages([]);
       }
+      
+      console.log('Session deleted successfully');
     } catch (error) {
       console.error('Error deleting session:', error);
+      console.error('Error response:', error.response);
+      // You could add a toast notification here to show the error to the user
     }
   };
 
   const loadMessages = async (sessionId) => {
     try {
+      console.log('Loading messages for session:', sessionId);
       const response = await api.get(`/chat/sessions/${sessionId}/messages/`);
+      console.log('Messages response:', response.data);
       setMessages(response.data.messages || []);
     } catch (error) {
       console.error('Error loading messages:', error);
+      console.error('Error details:', error.response?.data);
+      // Set empty messages array if loading fails
+      setMessages([]);
     }
   };
 
   const handleSendMessage = async () => {
-    if (!inputMessage.trim() || sending) return;
+    if (!inputMessage.trim() || sending || !currentSession) return;
 
     const message = inputMessage.trim();
     setInputMessage('');
@@ -94,70 +129,68 @@ const ChatPage = () => {
     setMessages(prev => [...prev, userMessage]);
 
     try {
-      // Always try RAG first - it will search across all documents
-      console.log('Using RAG chat for:', message);
+      // Use the session-based chat endpoint which saves messages to database
+      console.log('Sending message via session endpoint:', message);
+      const response = await api.post(`/chat/sessions/${currentSession.id}/messages/`, {
+        message: message,
+        document_id: documentId
+      });
       
-      // Get all available documents to search across
-      const documentsResponse = await api.get('/reader/documents/');
-      const allDocuments = documentsResponse.data.documents || [];
-      const allDocumentIds = allDocuments.map(doc => doc.id);
+      console.log('Session message response:', response.data);
       
-      console.log('Searching across documents:', allDocumentIds);
-      
-      // Prepare chat history for better context understanding (exclude the current user message)
-      const messagesBeforeCurrent = messages.slice(0, -1); // Exclude the current user message
-      const recentMessages = messagesBeforeCurrent.slice(-6); // Last 6 messages for context
-      const chatHistory = recentMessages.map(msg => ({
-        message_type: msg.type,
-        content: msg.content,
-        timestamp: msg.timestamp
-      }));
-      
-      console.log('Chat history being sent:', chatHistory);
-      
-      const ragResponse = await ragChat(message, allDocumentIds, chatHistory);
-      console.log('RAG response:', ragResponse);
-      console.log('RAG response data:', ragResponse.data);
-      
-      if (!ragResponse || !ragResponse.data) {
-        throw new Error('Invalid response from RAG service');
-      }
-      
-      const aiResponse = {
-        id: Date.now().toString() + '_ai',
+      // Add only the AI message from the response (user message already added)
+      const aiMessage = {
+        id: response.data.ai_response.id,
         type: 'ai',
-        content: ragResponse.data.response || ragResponse.data.answer || 'I found some information in your documents, but had trouble formatting the response.',
-        timestamp: new Date().toISOString(),
-        context: ragResponse.data.context || null,
-        sources: ragResponse.data.sources || null,
-        sourceChunks: ragResponse.data.source_chunks || 0
+        content: response.data.ai_response.content,
+        timestamp: response.data.ai_response.timestamp
       };
-
-      // Add AI response
-      setMessages(prev => [...prev, aiResponse]);
+      
+      // Update messages with the AI response
+      setMessages(prev => [...prev, aiMessage]);
+      
+      // Reload sessions to update the last_message and potentially updated title
+      await loadSessions();
       
     } catch (error) {
-      console.error('RAG Error:', error);
+      console.error('Session message error:', error);
       
-      // Fallback to session-based chat if RAG fails
+      // Fallback to RAG if session endpoint fails
       try {
-        if (currentSession) {
-          const response = await api.post(`/chat/sessions/${currentSession.id}/messages/`, {
-            content: message,
-            document_id: documentId
-          });
-          setMessages(prev => [...prev, response.data.message]);
-        } else {
-          // If no session, create one and try again
-          await createNewSession();
-          const fallbackMessage = {
-            id: Date.now().toString() + '_ai',
-            type: 'ai',
-            content: 'I had trouble accessing your documents. Please try asking again, or upload some documents first.',
-            timestamp: new Date().toISOString()
-          };
-          setMessages(prev => [...prev, fallbackMessage]);
+        console.log('Falling back to RAG chat');
+        
+        // Get all available documents to search across
+        const documentsResponse = await api.get('/reader/documents/');
+        const allDocuments = documentsResponse.data.documents || [];
+        const allDocumentIds = allDocuments.map(doc => doc.id);
+        
+        // Prepare chat history for better context understanding
+        const messagesBeforeCurrent = messages;
+        const recentMessages = messagesBeforeCurrent.slice(-6);
+        const chatHistory = recentMessages.map(msg => ({
+          message_type: msg.type,
+          content: msg.content,
+          timestamp: msg.timestamp
+        }));
+        
+        const ragResponse = await ragChat(message, allDocumentIds, chatHistory);
+        
+        if (!ragResponse || !ragResponse.data) {
+          throw new Error('Invalid response from RAG service');
         }
+        
+        const aiResponse = {
+          id: Date.now().toString() + '_ai',
+          type: 'ai',
+          content: ragResponse.data.response || ragResponse.data.answer || 'I found some information in your documents, but had trouble formatting the response.',
+          timestamp: new Date().toISOString(),
+          context: ragResponse.data.context || null,
+          sources: ragResponse.data.sources || null,
+          sourceChunks: ragResponse.data.source_chunks || 0
+        };
+
+        setMessages(prev => [...prev, aiResponse]);
+        
       } catch (fallbackError) {
         console.error('Fallback error:', fallbackError);
         const errorMessage = {
@@ -347,14 +380,101 @@ const ChatPage = () => {
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-gradient-to-br from-slate-50/50 to-gray-100/50 dark:from-gray-900/50 dark:to-slate-800/50" style={{maxHeight: 'calc(100vh - 240px)'}}>
               {messages.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="w-16 h-16 bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/50 dark:to-purple-900/50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-8 h-8 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                    </svg>
+                <div className="flex flex-col items-center justify-center h-full py-8">
+                  <div className="max-w-2xl mx-auto text-center">
+                    {/* Main greeting */}
+                    <div className="mb-8">
+                      <h1 className="text-4xl font-bold mb-4">
+                        <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600 dark:from-indigo-400 dark:via-purple-400 dark:to-blue-400 bg-clip-text text-transparent">
+                          Hello! I'm Mentora
+                        </span>
+                      </h1>
+                      <p className="text-xl text-gray-600 dark:text-gray-300 mb-2">
+                        Your AI study companion
+                      </p>
+                      <p className="text-gray-500 dark:text-gray-400">
+                        I can help you understand your documents, answer questions, and explore topics together
+                      </p>
+                    </div>
+
+                    {/* Suggestion cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                      <button
+                        onClick={() => setInputMessage("Summarize my documents")}
+                        className="group p-6 bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-600/50 rounded-2xl hover:bg-white dark:hover:bg-gray-700 transition-all duration-200 text-left shadow-sm hover:shadow-md"
+                      >
+                        <div className="flex items-start">
+                          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl flex items-center justify-center mr-4 group-hover:scale-110 transition-transform duration-200">
+                            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">Document Summary</h3>
+                            <p className="text-sm text-gray-600 dark:text-gray-300">Get key insights from your uploaded documents</p>
+                          </div>
+                        </div>
+                      </button>
+
+                      <button
+                        onClick={() => setInputMessage("Explain a concept from my documents")}
+                        className="group p-6 bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-600/50 rounded-2xl hover:bg-white dark:hover:bg-gray-700 transition-all duration-200 text-left shadow-sm hover:shadow-md"
+                      >
+                        <div className="flex items-start">
+                          <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center mr-4 group-hover:scale-110 transition-transform duration-200">
+                            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">Concept Explanation</h3>
+                            <p className="text-sm text-gray-600 dark:text-gray-300">Understand complex topics with detailed explanations</p>
+                          </div>
+                        </div>
+                      </button>
+
+                      <button
+                        onClick={() => setInputMessage("Generate study questions from my documents")}
+                        className="group p-6 bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-600/50 rounded-2xl hover:bg-white dark:hover:bg-gray-700 transition-all duration-200 text-left shadow-sm hover:shadow-md"
+                      >
+                        <div className="flex items-start">
+                          <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center mr-4 group-hover:scale-110 transition-transform duration-200">
+                            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">Study Questions</h3>
+                            <p className="text-sm text-gray-600 dark:text-gray-300">Create practice questions to test your knowledge</p>
+                          </div>
+                        </div>
+                      </button>
+
+                      <button
+                        onClick={() => setInputMessage("What topics are covered in my documents?")}
+                        className="group p-6 bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-600/50 rounded-2xl hover:bg-white dark:hover:bg-gray-700 transition-all duration-200 text-left shadow-sm hover:shadow-md"
+                      >
+                        <div className="flex items-start">
+                          <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl flex items-center justify-center mr-4 group-hover:scale-110 transition-transform duration-200">
+                            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                            </svg>
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">Topic Overview</h3>
+                            <p className="text-sm text-gray-600 dark:text-gray-300">Discover what subjects your documents cover</p>
+                          </div>
+                        </div>
+                      </button>
+                    </div>
+
+                    {/* Additional helpful text */}
+                    <div className="text-center">
+                      <p className="text-gray-500 dark:text-gray-400 text-sm">
+                        Or ask me anything else! I can help with both your documents and general academic questions.
+                      </p>
+                    </div>
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Start the conversation</h3>
-                  <p className="text-gray-600 dark:text-gray-300">Ask me anything about your documents or any topic you'd like to explore!</p>
                 </div>
               ) : (
                 <>
@@ -431,10 +551,10 @@ const ChatPage = () => {
                       value={inputMessage}
                       onChange={(e) => setInputMessage(e.target.value)}
                       onKeyPress={handleKeyPress}
-                      placeholder="Type your message..."
+                      placeholder={currentSession ? "Type your message..." : "Select or create a chat session to start chatting..."}
                       className="w-full resize-none border-2 border-gray-200 dark:border-gray-600 rounded-2xl px-4 py-3 pr-12 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-gray-100"
                       rows="3"
-                      disabled={sending}
+                      disabled={sending || !currentSession}
                     />
                     <div className="absolute bottom-3 right-3 text-xs text-gray-400 dark:text-gray-500">
                       Press Enter to send
@@ -442,7 +562,7 @@ const ChatPage = () => {
                   </div>
                   <button
                     onClick={handleSendMessage}
-                    disabled={!inputMessage.trim() || sending}
+                    disabled={!inputMessage.trim() || sending || !currentSession}
                     className="bg-gradient-to-r from-indigo-500 to-purple-600 dark:from-indigo-600 dark:to-purple-700 text-white px-6 py-3 rounded-2xl hover:from-indigo-600 hover:to-purple-700 dark:hover:from-indigo-700 dark:hover:to-purple-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 self-end shadow-lg flex items-center justify-center min-w-[80px]"
                   >
                     {sending ? (
