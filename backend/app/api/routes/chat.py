@@ -13,7 +13,7 @@ from app.models.user import User
 from app.models.chat import ChatSession, ChatMessage
 from app.models.document import Document, Page
 from app.schemas.chat import (
-    ChatSessionCreate, MessageSend, ConceptExplain,
+    ChatSessionCreate, ChatSessionUpdate, MessageSend, ConceptExplain,
     ChatSessionResponse, ChatSessionListResponse,
     MessagesListResponse, MessageResponse, MessageSendResponse
 )
@@ -127,6 +127,38 @@ async def delete_session(
     await db.commit()
     
     return {"message": "Session deleted successfully"}
+
+
+@router.put("/sessions/{session_id}/")
+async def update_session(
+    session_id: str,
+    update_data: ChatSessionUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Update a chat session (currently only title)"""
+    result = await db.execute(
+        select(ChatSession).where(
+            ChatSession.id == session_id,
+            ChatSession.user_id == current_user.id
+        )
+    )
+    session = result.scalar_one_or_none()
+    
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    # Update title if provided
+    if update_data.title is not None:
+        session.title = update_data.title
+        await db.commit()
+        await db.refresh(session)
+    
+    return {
+        "session_id": session.id,
+        "title": session.title,
+        "message": "Session updated successfully"
+    }
 
 
 @router.get("/sessions/{session_id}/messages/", response_model=MessagesListResponse)

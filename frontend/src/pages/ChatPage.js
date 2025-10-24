@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import api, { deleteChatSession } from '../services/api';
+import { useToast } from '../contexts/ToastContext';
 import '../styles/message-formatting.css';
 
 // Function to format AI responses with better typography
@@ -32,6 +33,7 @@ const ChatPage = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const documentId = searchParams.get('document');
+  const { showSuccess, showError, showInfo } = useToast();
   
   const [sessions, setSessions] = useState([]);
   const [currentSession, setCurrentSession] = useState(null);
@@ -40,6 +42,9 @@ const ChatPage = () => {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [searchDocuments, setSearchDocuments] = useState(false); // New state for PDF search toggle
+  const [copiedMessageId, setCopiedMessageId] = useState(null); // For copy feedback
+  const [editingSessionId, setEditingSessionId] = useState(null); // For session renaming
+  const [editingSessionTitle, setEditingSessionTitle] = useState(''); // For session renaming
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -127,11 +132,11 @@ const ChatPage = () => {
         setMessages([]);
       }
       
+      showSuccess('Session deleted successfully');
       console.log('Session deleted successfully');
     } catch (error) {
       console.error('Error deleting session:', error);
-      console.error('Error response:', error.response);
-      // You could add a toast notification here to show the error to the user
+      showError('Failed to delete session. Please try again.');
     }
   };
 
@@ -201,6 +206,9 @@ const ChatPage = () => {
         timestamp: new Date().toISOString()
       };
       setMessages(prev => [...prev, errorMessage]);
+      
+      // Show toast notification
+      showError('Failed to send message. Please try again.');
     } finally {
       setSending(false);
     }
@@ -210,6 +218,89 @@ const ChatPage = () => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
+    }
+  };
+
+  // Copy message to clipboard
+  const copyToClipboard = async (messageId, content) => {
+    try {
+      // Remove HTML tags from formatted content
+      const textContent = content
+        .replace(/<[^>]*>/g, '') // Remove HTML tags
+        .replace(/&nbsp;/g, ' ') // Replace &nbsp; with space
+        .replace(/&amp;/g, '&') // Replace &amp; with &
+        .replace(/&lt;/g, '<') // Replace &lt; with <
+        .replace(/&gt;/g, '>'); // Replace &gt; with >
+      
+      await navigator.clipboard.writeText(textContent);
+      setCopiedMessageId(messageId);
+      
+      // Show success toast
+      showSuccess('Message copied to clipboard!');
+      
+      // Reset the copied state after 2 seconds
+      setTimeout(() => {
+        setCopiedMessageId(null);
+      }, 2000);
+    } catch (error) {
+      console.error('Failed to copy message:', error);
+      showError('Failed to copy message');
+    }
+  };
+
+  // Start editing session name
+  const startEditingSession = (sessionId, currentTitle, event) => {
+    event.stopPropagation();
+    setEditingSessionId(sessionId);
+    setEditingSessionTitle(currentTitle);
+  };
+
+  // Save edited session name
+  const saveSessionName = async (sessionId) => {
+    if (!editingSessionTitle.trim()) {
+      setEditingSessionId(null);
+      return;
+    }
+
+    try {
+      await api.put(`/chat/sessions/${sessionId}/`, {
+        title: editingSessionTitle
+      });
+      
+      // Update local state
+      setSessions(prev => prev.map(session => 
+        session.id === sessionId 
+          ? { ...session, title: editingSessionTitle }
+          : session
+      ));
+      
+      // Update current session if it's the one being edited
+      if (currentSession?.id === sessionId) {
+        setCurrentSession(prev => ({ ...prev, title: editingSessionTitle }));
+      }
+      
+      setEditingSessionId(null);
+      showSuccess('Session renamed successfully');
+    } catch (error) {
+      console.error('Error updating session title:', error);
+      showError('Failed to rename session');
+      setEditingSessionId(null);
+    }
+  };
+
+  // Cancel editing session name
+  const cancelEditingSession = () => {
+    setEditingSessionId(null);
+    setEditingSessionTitle('');
+  };
+
+  // Handle key press in session title edit
+  const handleSessionTitleKeyPress = (e, sessionId) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      saveSessionName(sessionId);
+    } else if (e.key === 'Escape') {
+      cancelEditingSession();
     }
   };
 
@@ -295,7 +386,35 @@ const ChatPage = () => {
                       </svg>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-gray-900 dark:text-gray-100 truncate text-sm">{session.title || 'Untitled Chat'}</h3>
+                      {/* Editable session title */}
+                      {editingSessionId === session.id ? (
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="text"
+                            value={editingSessionTitle}
+                            onChange={(e) => setEditingSessionTitle(e.target.value)}
+                            onKeyDown={(e) => handleSessionTitleKeyPress(e, session.id)}
+                            onBlur={() => saveSessionName(session.id)}
+                            autoFocus
+                            className="w-full px-2 py-1 text-sm font-semibold bg-white dark:bg-gray-600 border-2 border-indigo-500 dark:border-indigo-400 rounded-lg text-gray-900 dark:text-gray-100 focus:outline-none"
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1">
+                          <h3 className="font-semibold text-gray-900 dark:text-gray-100 truncate text-sm flex-1">
+                            {session.title || 'Untitled Chat'}
+                          </h3>
+                          <button
+                            onClick={(e) => startEditingSession(session.id, session.title, e)}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 rounded"
+                            title="Rename session"
+                          >
+                            <svg className="w-3 h-3 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+                        </div>
+                      )}
                       <div className="flex items-center mt-1">
                         <svg className="w-3 h-3 text-gray-400 dark:text-gray-500 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3a1 1 0 011-1h6a1 1 0 011 1v4m-6 0v1m6-1v1m-6 0H6a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V9a2 2 0 00-2-2h-3" />
@@ -487,30 +606,59 @@ const ChatPage = () => {
                             </svg>
                           )}
                         </div>
-                        <div
-                          className={`px-4 py-3 rounded-2xl shadow-sm ${
-                            message.role === 'user'
-                              ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white'
-                              : 'bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-600/50 text-gray-900 dark:text-gray-100'
-                          }`}
-                        >
-                          {message.role === 'user' ? (
-                            <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
-                          ) : (
-                            <div 
-                              className="formatted-content leading-relaxed"
-                              dangerouslySetInnerHTML={{
-                                __html: formatAIResponse(message.content)
-                              }}
-                            />
-                          )}
-                          <p
-                            className={`text-xs mt-2 ${
-                              message.role === 'user' ? 'text-indigo-100' : 'text-gray-500 dark:text-gray-400'
+                        <div className="flex flex-col">
+                          <div
+                            className={`px-4 py-3 rounded-2xl shadow-sm ${
+                              message.role === 'user'
+                                ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white'
+                                : 'bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-600/50 text-gray-900 dark:text-gray-100'
                             }`}
                           >
-                            {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </p>
+                            {message.role === 'user' ? (
+                              <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                            ) : (
+                              <div 
+                                className="formatted-content leading-relaxed"
+                                dangerouslySetInnerHTML={{
+                                  __html: formatAIResponse(message.content)
+                                }}
+                              />
+                            )}
+                          </div>
+                          
+                          {/* Message actions and timestamp */}
+                          <div className={`flex items-center gap-2 mt-1 px-1 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                            
+                            {/* Copy button for all messages */}
+                            <button
+                              onClick={() => copyToClipboard(message.id, message.content)}
+                              className={`text-xs px-2 py-1 rounded-lg transition-all duration-200 flex items-center gap-1 ${
+                                copiedMessageId === message.id
+                                  ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
+                                  : 'bg-gray-100 dark:bg-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-500'
+                              }`}
+                              title="Copy message"
+                            >
+                              {copiedMessageId === message.id ? (
+                                <>
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                  Copied!
+                                </>
+                              ) : (
+                                <>
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                  </svg>
+                                  Copy
+                                </>
+                              )}
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>

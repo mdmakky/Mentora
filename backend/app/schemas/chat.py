@@ -15,6 +15,11 @@ class ChatSessionCreate(BaseModel):
     document_id: Optional[str] = None
 
 
+class ChatSessionUpdate(BaseModel):
+    """Schema for updating a chat session"""
+    title: Optional[str] = None
+
+
 class MessageSend(BaseModel):
     """Schema for sending a message"""
     content: str

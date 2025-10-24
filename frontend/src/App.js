@@ -10,6 +10,7 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ProfilePage from './pages/ProfilePage';
 import Navbar from './components/Navbar';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { ToastProvider } from './contexts/ToastContext';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -20,7 +21,8 @@ const ProtectedRoute = ({ children }) => {
 function App() {
   return (
     <ThemeProvider>
-      <Router>
+      <ToastProvider>
+        <Router>
         <div className="App min-h-screen bg-gradient-to-br from-slate-50 to-gray-100 dark:from-gray-900 dark:to-slate-800 transition-colors duration-300">
           <Routes>
             {/* Landing Page - Public */}
@@ -93,6 +95,7 @@ function App() {
           </Routes>
         </div>
       </Router>
+      </ToastProvider>
     </ThemeProvider>
   );
 }
