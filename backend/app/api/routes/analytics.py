@@ -197,17 +197,25 @@ async def record_session(
         db.add(stats)
     
     stats.total_study_time_minutes += duration
-    stats.last_study_date = session.date
     
-    # Update streak
+    # Update streak - calculate BEFORE updating last_study_date
     if stats.last_study_date:
         days_diff = (session.date - stats.last_study_date).days
-        if days_diff == 1:
+        if days_diff == 0:
+            # Same day - don't change streak
+            pass
+        elif days_diff == 1:
+            # Consecutive day - increment streak
             stats.current_study_streak_days += 1
-        elif days_diff > 1:
+        else:
+            # Gap in days - reset streak to 1
             stats.current_study_streak_days = 1
     else:
+        # First session ever
         stats.current_study_streak_days = 1
+    
+    # Update last study date after streak calculation
+    stats.last_study_date = session.date
     
     await db.commit()
     await db.refresh(session)
@@ -215,4 +223,31 @@ async def record_session(
     return {
         "message": "Session recorded successfully",
         "session_id": session.id
+    }
+
+@router.get("/sessions/")
+async def get_sessions(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get all study sessions for current user"""
+    result = await db.execute(
+        select(StudySession)
+        .where(StudySession.user_id == current_user.id)
+        .order_by(StudySession.start_time.desc())
+    )
+    sessions = result.scalars().all()
+    
+    return {
+        "sessions": [
+            {
+                "id": session.id,
+                "document_id": session.document_id,
+                "duration_minutes": session.duration_minutes,
+                "pages_viewed": session.pages_viewed,
+                "date": session.date.isoformat() if session.date else None,
+                "start_time": session.start_time.isoformat() if session.start_time else None
+            }
+            for session in sessions
+        ]
     }

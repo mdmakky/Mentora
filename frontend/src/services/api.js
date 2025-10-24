@@ -170,12 +170,15 @@ export const getDocumentAnalytics = (documentId) => {
   return api.get(`/analytics/documents/${documentId}`);
 };
 
-export const recordStudySession = (duration, pagesViewed = 0, documentId = null) => {
-  return api.post('/analytics/sessions', {
+export const recordStudySession = (duration, documentId = null) => {
+  const params = {
     duration,
-    pages_viewed: pagesViewed,
-    document_id: documentId,
-  });
+    pages_viewed: 0,
+  };
+  if (documentId) {
+    params.document_id = documentId;
+  }
+  return api.post('/analytics/sessions/', null, { params });
 };
 
 // Remove functions not implemented in backend

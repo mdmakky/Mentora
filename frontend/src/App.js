@@ -67,10 +67,7 @@ function App() {
               path="/analytics" 
               element={
                 <ProtectedRoute>
-                  <>
-                    <Navbar />
-                    <AnalyticsPage />
-                  </>
+                  <AnalyticsPage />
                 </ProtectedRoute>
               } 
             />

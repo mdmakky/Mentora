@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Document, Page, pdfjs } from 'react-pdf';
-import { getDocumentFile, explainConcept, getDocument } from '../services/api';
+import { getDocumentFile, explainConcept, getDocument, recordStudySession } from '../services/api';
 import { jsPDF } from 'jspdf';
 
 // Import CSS for text layer
@@ -15,6 +15,7 @@ const PDFViewerPage = () => {
   const { documentId } = useParams();
   const navigate = useNavigate();
   const messagesEndRef = useRef(null);
+  const sessionStartTime = useRef(null);
   
   const [document, setDocument] = useState(null);
   const [numPages, setNumPages] = useState(0);
@@ -60,6 +61,53 @@ const PDFViewerPage = () => {
 
   useEffect(() => {
     fetchDocument();
+    
+    // Start session timer
+    sessionStartTime.current = Date.now();
+    console.log('📚 PDF session started');
+    
+    // Record session when user leaves
+    return () => {
+      if (sessionStartTime.current && documentId) {
+        const durationMs = Date.now() - sessionStartTime.current;
+        const durationMinutes = Math.round(durationMs / 60000);
+        
+        // Only record if user spent at least 1 minute (60 seconds)
+        if (durationMinutes < 1) {
+          console.log('⏭️ Session too short, not recording (less than 1 minute)');
+          return;
+        }
+        
+        console.log(`📊 Recording session: ${durationMinutes} minutes for document ${documentId}`);
+        
+        // Record session synchronously using fetch (more reliable on unmount)
+        const authToken = localStorage.getItem('authToken');
+        
+        // Build query params
+        const params = new URLSearchParams({
+          duration: durationMinutes,
+          pages_viewed: 0,
+          document_id: documentId
+        });
+        
+        fetch(`http://localhost:8000/api/analytics/sessions/?${params.toString()}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${authToken}`
+          },
+          keepalive: true // Important: allows request to complete even after page unload
+        })
+        .then(response => {
+          if (response.ok) {
+            console.log('✅ Session recorded successfully');
+          } else {
+            console.error('❌ Session recording failed:', response.status);
+            response.text().then(text => console.error('Error details:', text));
+          }
+        })
+        .catch(err => console.error('❌ Session recording error:', err));
+      }
+    };
   }, [documentId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
