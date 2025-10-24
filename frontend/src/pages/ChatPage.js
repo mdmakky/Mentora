@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import api, { ragChat, deleteChatSession } from '../services/api';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import api, { deleteChatSession } from '../services/api';
 import '../styles/message-formatting.css';
 
 // Function to format AI responses with better typography
@@ -30,6 +30,7 @@ const formatAIResponse = (text) => {
 
 const ChatPage = () => {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const documentId = searchParams.get('document');
   
   const [sessions, setSessions] = useState([]);
@@ -50,6 +51,7 @@ const ChatPage = () => {
   }, [messages]);
 
   useEffect(() => {
+    // Load chat sessions
     loadSessions();
   }, []);
 
@@ -148,7 +150,7 @@ const ChatPage = () => {
   };
 
   const handleSendMessage = async () => {
-    if (!inputMessage.trim() || sending || !currentSession) return;
+    if (!inputMessage.trim() || sending) return;
 
     const message = inputMessage.trim();
     setInputMessage('');
@@ -157,16 +159,16 @@ const ChatPage = () => {
     // Add user message to UI immediately
     const userMessage = {
       id: Date.now().toString(),
-      type: 'user',
+      role: 'user',
       content: message,
       timestamp: new Date().toISOString()
     };
     setMessages(prev => [...prev, userMessage]);
 
     try {
-      // Use the session-based chat endpoint which saves messages to database
+      // Send message via session-based chat endpoint
       console.log('Sending message via session endpoint:', message, 'Search docs:', searchDocuments);
-      const response = await api.post(`/chat/sessions/${currentSession.id}/messages/`, {
+      const response = await api.post(`/chat/sessions/${currentSession.id}/messages`, {
         message: message,
         document_id: documentId,
         search_documents: searchDocuments
@@ -177,7 +179,7 @@ const ChatPage = () => {
       // Add only the AI message from the response (user message already added)
       const aiMessage = {
         id: response.data.ai_response.id,
-        type: 'ai',
+        role: 'assistant',
         content: response.data.ai_response.content,
         timestamp: response.data.ai_response.timestamp
       };
@@ -191,52 +193,14 @@ const ChatPage = () => {
     } catch (error) {
       console.error('Session message error:', error);
       
-      // Fallback to RAG if session endpoint fails
-      try {
-        console.log('Falling back to RAG chat');
-        
-        // Get all available documents to search across
-        const documentsResponse = await api.get('/reader/documents/');
-        const allDocuments = documentsResponse.data.documents || [];
-        const allDocumentIds = allDocuments.map(doc => doc.id);
-        
-        // Prepare chat history for better context understanding
-        const messagesBeforeCurrent = messages;
-        const recentMessages = messagesBeforeCurrent.slice(-6);
-        const chatHistory = recentMessages.map(msg => ({
-          message_type: msg.type,
-          content: msg.content,
-          timestamp: msg.timestamp
-        }));
-        
-        const ragResponse = await ragChat(message, allDocumentIds, chatHistory);
-        
-        if (!ragResponse || !ragResponse.data) {
-          throw new Error('Invalid response from RAG service');
-        }
-        
-        const aiResponse = {
-          id: Date.now().toString() + '_ai',
-          type: 'ai',
-          content: ragResponse.data.response || ragResponse.data.answer || 'I found some information in your documents, but had trouble formatting the response.',
-          timestamp: new Date().toISOString(),
-          context: ragResponse.data.context || null,
-          sources: ragResponse.data.sources || null,
-          sourceChunks: ragResponse.data.source_chunks || 0
-        };
-
-        setMessages(prev => [...prev, aiResponse]);
-        
-      } catch (fallbackError) {
-        console.error('Fallback error:', fallbackError);
-        const errorMessage = {
-          id: Date.now().toString() + '_ai',
-          type: 'ai',
-          content: 'Sorry, I encountered an error. Please make sure your documents are uploaded and try again.',
-          timestamp: new Date().toISOString()
-        };
-        setMessages(prev => [...prev, errorMessage]);
-      }
+      // Display error message to user
+      const errorMessage = {
+        id: Date.now().toString() + '_ai',
+        role: 'assistant',
+        content: 'Sorry, I encountered an error. Please make sure your documents are uploaded and try again.',
+        timestamp: new Date().toISOString()
+      };
+      setMessages(prev => [...prev, errorMessage]);
     } finally {
       setSending(false);
     }
@@ -371,6 +335,7 @@ const ChatPage = () => {
 
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col h-full">
+        
         {!currentSession ? (
           <div className="flex-1 flex items-center justify-center p-8">
             <div className="text-center max-w-md">
@@ -504,15 +469,15 @@ const ChatPage = () => {
                   {messages.map((message) => (
                     <div
                       key={message.id}
-                      className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
+                      className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                     >
-                      <div className={`flex items-start max-w-xs lg:max-w-2xl ${message.type === 'user' ? 'flex-row-reverse' : ''}`}>
+                      <div className={`flex items-start max-w-xs lg:max-w-2xl ${message.role === 'user' ? 'flex-row-reverse' : ''}`}>
                         <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                          message.type === 'user' 
+                          message.role === 'user' 
                             ? 'bg-gradient-to-br from-indigo-500 to-purple-600 ml-3' 
                             : 'bg-gradient-to-br from-green-500 to-emerald-600 mr-3'
                         }`}>
-                          {message.type === 'user' ? (
+                          {message.role === 'user' ? (
                             <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                             </svg>
@@ -524,12 +489,12 @@ const ChatPage = () => {
                         </div>
                         <div
                           className={`px-4 py-3 rounded-2xl shadow-sm ${
-                            message.type === 'user'
+                            message.role === 'user'
                               ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white'
                               : 'bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-600/50 text-gray-900 dark:text-gray-100'
                           }`}
                         >
-                          {message.type === 'user' ? (
+                          {message.role === 'user' ? (
                             <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
                           ) : (
                             <div 
@@ -541,7 +506,7 @@ const ChatPage = () => {
                           )}
                           <p
                             className={`text-xs mt-2 ${
-                              message.type === 'user' ? 'text-indigo-100' : 'text-gray-500 dark:text-gray-400'
+                              message.role === 'user' ? 'text-indigo-100' : 'text-gray-500 dark:text-gray-400'
                             }`}
                           >
                             {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

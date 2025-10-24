@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Document, Page, pdfjs } from 'react-pdf';
-import { getDocumentFile, explainConcept } from '../services/api';
+import { getDocumentFile, explainConcept, getDocument } from '../services/api';
+import { jsPDF } from 'jspdf';
 
 // Import CSS for text layer
 import 'react-pdf/dist/Page/AnnotationLayer.css';
@@ -31,11 +32,9 @@ const PDFViewerPage = () => {
     try {
       setLoading(true);
       
-      // Get document list and find the specific document
-      const response = await fetch('http://localhost:8000/api/reader/documents/');
-      const data = await response.json();
-      const documents = data.documents || data;
-      const documentData = documents.find(doc => doc.id === documentId);
+      // Get document using authenticated API
+      const response = await getDocument(documentId);
+      const documentData = response.data;
       
       if (!documentData) {
         setError('Document not found');
@@ -98,15 +97,13 @@ const PDFViewerPage = () => {
     setIsAiTyping(true);
 
     try {
-      // Prepare chat history for better context understanding
-      const recentMessages = messages.slice(-6); // Last 6 messages for context
-      const chatHistory = recentMessages.map(msg => ({
-        message_type: msg.isUser ? 'user' : 'ai',
-        content: msg.text,
-        timestamp: msg.timestamp.toISOString()
+      // Prepare chat history in correct format for backend
+      const chatHistory = messages.map(msg => ({
+        role: msg.isUser ? 'user' : 'assistant',
+        content: msg.text
       }));
       
-      console.log('PDFViewer chat history being sent:', chatHistory);
+      console.log('Sending to AI with history:', chatHistory.length, 'messages');
       
       const response = await explainConcept(inputMessage.trim(), documentId, chatHistory);
       
@@ -134,27 +131,102 @@ const PDFViewerPage = () => {
   const handleDownloadConversation = () => {
     if (messages.length === 0) return;
     
-    const conversationText = [
-      `AI Chat Conversation - ${document?.title || 'Document'}`,
-      `Generated on: ${new Date().toLocaleString()}`,
-      '='.repeat(50),
-      '',
-      ...messages.map(msg => [
-        `${msg.isUser ? 'You' : 'AI Assistant'} (${msg.timestamp.toLocaleTimeString()}):`,
-        msg.text,
-        ''
-      ].join('\n'))
-    ].join('\n');
-    
-    const blob = new Blob([conversationText], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const link = window.document.createElement('a');
-    link.href = url;
-    link.download = `conversation-${document?.title?.replace(/[^a-z0-9]/gi, '_') || 'document'}-${new Date().toISOString().split('T')[0]}.txt`;
-    window.document.body.appendChild(link);
-    link.click();
-    window.document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    try {
+      // Create new PDF document
+      const doc = new jsPDF();
+      
+      // Set up styling
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const margin = 20;
+      const maxWidth = pageWidth - (2 * margin);
+      let yPosition = 20;
+      
+      // Title
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('AI Chat Conversation', margin, yPosition);
+      yPosition += 10;
+      
+      // Document info
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(100);
+      doc.text(`Document: ${document?.title || 'Untitled'}`, margin, yPosition);
+      yPosition += 6;
+      doc.text(`Generated: ${new Date().toLocaleString()}`, margin, yPosition);
+      yPosition += 6;
+      doc.text(`Messages: ${messages.length}`, margin, yPosition);
+      yPosition += 12;
+      
+      // Separator line
+      doc.setDrawColor(200);
+      doc.line(margin, yPosition, pageWidth - margin, yPosition);
+      yPosition += 10;
+      
+      // Messages
+      doc.setTextColor(0);
+      messages.forEach((msg, index) => {
+        // Check if we need a new page
+        if (yPosition > 270) {
+          doc.addPage();
+          yPosition = 20;
+        }
+        
+        // Message header
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold');
+        if (msg.isUser) {
+          doc.setTextColor(37, 99, 235); // Blue for user
+        } else {
+          doc.setTextColor(139, 92, 246); // Purple for AI
+        }
+        const header = `${msg.isUser ? '👤 You' : '🤖 AI Assistant'} • ${msg.timestamp.toLocaleTimeString()}`;
+        doc.text(header, margin, yPosition);
+        yPosition += 7;
+        
+        // Message content
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(0);
+        doc.setFontSize(10);
+        
+        // Split text to fit width
+        const lines = doc.splitTextToSize(msg.text, maxWidth);
+        lines.forEach(line => {
+          if (yPosition > 270) {
+            doc.addPage();
+            yPosition = 20;
+          }
+          doc.text(line, margin, yPosition);
+          yPosition += 5;
+        });
+        
+        yPosition += 8; // Space between messages
+      });
+      
+      // Add footer to all pages
+      const pageCount = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(150);
+        doc.setFont('helvetica', 'italic');
+        doc.text(
+          `Page ${i} of ${pageCount} • Generated by Mentora AI`,
+          pageWidth / 2,
+          doc.internal.pageSize.getHeight() - 10,
+          { align: 'center' }
+        );
+      }
+      
+      // Download
+      const filename = `mentora-chat-${document?.title?.replace(/[^a-z0-9]/gi, '_') || 'document'}-${new Date().toISOString().split('T')[0]}.pdf`;
+      doc.save(filename);
+      
+      console.log('✅ PDF conversation exported successfully');
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Failed to generate PDF. Please try again.');
+    }
   };
 
   const handleKeyPress = (event) => {

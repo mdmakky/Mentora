@@ -29,7 +29,7 @@ const StudyPage = () => {
     }
 
     try {
-      await api.delete(`/reader/documents/${documentId}/delete/`);
+      await api.delete(`/reader/documents/${documentId}`);
       await fetchDocuments(); // Refresh the list
       setError(null);
     } catch (err) {
@@ -212,27 +212,28 @@ const StudyPage = () => {
                       </div>
                     </div>
 
-                    {/* Topics */}
-                    {doc.topics && doc.topics.length > 0 && (
-                      <div className="mb-8">
-                        <h4 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">Topics</h4>
-                        <div className="flex flex-wrap gap-2">
-                          {doc.topics.slice(0, 3).map((topic, index) => (
-                            <span
-                              key={index}
-                              className="inline-block bg-gradient-to-r from-blue-100 to-indigo-100 dark:from-blue-900/50 dark:to-indigo-900/50 text-indigo-900 dark:text-indigo-200 text-sm px-4 py-2 rounded-full border border-indigo-300 dark:border-indigo-700 font-semibold shadow-sm"
-                            >
-                              {topic}
-                            </span>
-                          ))}
-                          {doc.topics.length > 3 && (
-                            <span className="inline-block bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700/50 dark:to-gray-600/50 text-gray-800 dark:text-gray-200 text-sm px-4 py-2 rounded-full border border-gray-400 dark:border-gray-600 font-semibold shadow-sm">
-                              +{doc.topics.length - 3} more
-                            </span>
-                          )}
-                        </div>
+                    {/* Processing Status */}
+                    <div className="mb-8">
+                      <h4 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">Status</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {doc.is_processed && (
+                          <span className="inline-flex items-center bg-gradient-to-r from-green-100 to-emerald-100 dark:from-green-900/50 dark:to-emerald-900/50 text-green-800 dark:text-green-200 text-sm px-4 py-2 rounded-full border border-green-300 dark:border-green-700 font-semibold shadow-sm">
+                            <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                            </svg>
+                            Text Extracted
+                          </span>
+                        )}
+                        {doc.is_embedded && (
+                          <span className="inline-flex items-center bg-gradient-to-r from-blue-100 to-indigo-100 dark:from-blue-900/50 dark:to-indigo-900/50 text-indigo-900 dark:text-indigo-200 text-sm px-4 py-2 rounded-full border border-indigo-300 dark:border-indigo-700 font-semibold shadow-sm">
+                            <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                              <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" />
+                            </svg>
+                            AI Ready
+                          </span>
+                        )}
                       </div>
-                    )}
+                    </div>
 
                     {/* Actions */}
                     <div className="flex space-x-3 mt-auto pt-4">
